@@ -14,7 +14,7 @@ chrono = { version = "0.4", features = ["serde"] }
 ipnetwork = "0.20"
 
 # Audit log parser
-linux-audit-parser = "0.5"
+linux-audit-parser = "0.2.7"
 
 # Random ID generation
 rand = "0.8"

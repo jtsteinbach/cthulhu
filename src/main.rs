@@ -12,6 +12,8 @@ use std::{
     sync::{Arc, Mutex},
     collections::{HashMap, HashSet},
     io,
+    path::Path,
+    process::Command,
 };
 use chrono::{DateTime, Utc};
 use serde_json::Value;
@@ -41,7 +43,40 @@ pub const F_LISTEN_PID: &str = "LISTEN_PID";
 pub const F_LISTEN_FDS: &str = "LISTEN_FDS";
 pub const F_REALTIME: &str   = "__REALTIME_TIMESTAMP";
 
+// 👈 NEW: Ensure auditd is installed
+fn ensure_auditd_installed() -> io::Result<()> {
+    let output = Command::new("which").arg("auditd").output()?;
+    if !output.status.success() {
+        println!("🛠️ auditd not found. Installing...");
+        let script = "./src/scripts/install_auditd.sh";
+        if !Path::new(script).exists() {
+            return Err(io::Error::new(io::ErrorKind::NotFound, "Missing install_auditd.sh"));
+        }
+        let status = Command::new("bash").arg(script).status()?;
+        if !status.success() {
+            return Err(io::Error::new(io::ErrorKind::Other, "auditd install script failed"));
+        }
+    } else {
+        println!("✅ auditd already installed.");
+    }
+    Ok(())
+}
+
+// 👈 NEW: Ensure config exists
+fn ensure_config_exists() -> io::Result<()> {
+    if !Path::new(CONFIG_FILE).exists() {
+        println!("📄 Creating default config at {CONFIG_FILE}...");
+        let default = b"alerts_dir = allow\nalerts_journald = allow\n";
+        fs::create_dir_all(Path::new(CONFIG_FILE).parent().unwrap())?;
+        fs::write(CONFIG_FILE, default)?;
+    }
+    Ok(())
+}
+
 fn main() -> io::Result<()> {
+    ensure_auditd_installed()?;    // 👈 NEW
+    ensure_config_exists()?;       // 👈 NEW
+
     fs::create_dir_all(ALERTS_DIR)?;
     fs::set_permissions(ALERTS_DIR, Permissions::from_mode(0o700))?;
 

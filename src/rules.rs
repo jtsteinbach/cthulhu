@@ -14,8 +14,7 @@ pub struct RuleSpec {
     pub criteria: Vec<Criterion>,
 }
 
-/// A single criterion within a rule.
-#[derive(Debug, Deserialize, Clone)]
+#[derive(Debug, Deserialize, Clone, Serialize)]
 pub struct Criterion {
     pub field: String,
     pub op: String,

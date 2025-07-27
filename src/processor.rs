@@ -17,8 +17,8 @@ pub fn spawn_audit_processor(
     cfg: Config
 ) {
     thread::spawn(move || {
-        let mut parser = linux_audit_parser::Parser::default();
-        let mut child = match Command::new("tail")
+        let parser = linux_audit_parser::Parser::default();
+        let child = match Command::new("tail")
             .args(&["-n", "0", "-F", AUDIT_LOG])
             .stdout(Stdio::piped())
             .spawn()
