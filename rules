@@ -1,5 +1,5 @@
 // Shard SIEM Rules - JRL (Jaco Ruling Language) Guide
-// https://jts.gg/obsidian/jrl
+// https://jts.gg/cthulhu/jrl
 //
 // Below is a labeled breakdown of every event type and exactly which fields you can use
 // when writing rules.  If a field does not exist for a given event, any criterion testing that field simply fails.
