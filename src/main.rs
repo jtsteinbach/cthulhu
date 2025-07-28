@@ -43,7 +43,7 @@ pub const F_LISTEN_PID: &str = "LISTEN_PID";
 pub const F_LISTEN_FDS: &str = "LISTEN_FDS";
 pub const F_REALTIME: &str   = "__REALTIME_TIMESTAMP";
 
-// 👈 NEW: Ensure auditd is installed
+// Ensure auditd is installed
 fn ensure_auditd_installed() -> io::Result<()> {
     let output = Command::new("which").arg("auditd").output()?;
     if !output.status.success() {
@@ -57,15 +57,15 @@ fn ensure_auditd_installed() -> io::Result<()> {
             return Err(io::Error::new(io::ErrorKind::Other, "auditd install script failed"));
         }
     } else {
-        println!("✅ auditd already installed.");
+        println!("Auditd already installed.");
     }
     Ok(())
 }
 
-// 👈 NEW: Ensure config exists
+// Ensure config exists
 fn ensure_config_exists() -> io::Result<()> {
     if !Path::new(CONFIG_FILE).exists() {
-        println!("📄 Creating default config at {CONFIG_FILE}...");
+        println!("Creating default config at {CONFIG_FILE}...");
         let default = b"alerts_dir = allow\nalerts_journald = allow\n";
         fs::create_dir_all(Path::new(CONFIG_FILE).parent().unwrap())?;
         fs::write(CONFIG_FILE, default)?;
@@ -74,8 +74,8 @@ fn ensure_config_exists() -> io::Result<()> {
 }
 
 fn main() -> io::Result<()> {
-    ensure_auditd_installed()?;    // 👈 NEW
-    ensure_config_exists()?;       // 👈 NEW
+    ensure_auditd_installed()?;
+    ensure_config_exists()?;
 
     fs::create_dir_all(ALERTS_DIR)?;
     fs::set_permissions(ALERTS_DIR, Permissions::from_mode(0o700))?;

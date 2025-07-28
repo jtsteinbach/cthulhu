@@ -1,7 +1,7 @@
 // src/alert.rs
 use rand::{distributions::Alphanumeric, Rng};
 use serde_json::json;
-use sha2::{Sha256, Digest};
+use sha2::{Digest, Sha256};
 use std::fs::File;
 use std::io::Write;
 use std::process::{Command, Stdio};
@@ -60,8 +60,11 @@ pub fn dispatch_alert(rule: &RuleSpec, event: &Event, signature: &str, cfg: &cra
         "description":    rule.description,
         "event":          event,
     });
-    let body = serde_json::to_string_pretty(&alert_obj).unwrap() + "\n";
 
+    // Compact JSON string, no newline to avoid split
+    let body = serde_json::to_string(&alert_obj).unwrap();
+
+    // Write to alerts directory if enabled
     if cfg.alerts_dir {
         let filename = format!(
             "{}/{}_{}_{}.alert",
@@ -70,9 +73,11 @@ pub fn dispatch_alert(rule: &RuleSpec, event: &Event, signature: &str, cfg: &cra
             event.time.with_timezone(&Local).format("%Y%m%d_%H%M%S"),
             alert_id
         );
-        let _ = File::create(&filename).and_then(|mut f| f.write_all(body.as_bytes()));
+        let _ = File::create(&filename)
+            .and_then(|mut f| f.write_all((body.clone() + "\n").as_bytes()));
     }
 
+    // Send to journald via logger, piping full JSON to stdin
     if cfg.alerts_journald {
         if let Ok(mut logger) = Command::new("logger")
             .arg("-t")
