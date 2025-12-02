@@ -21,6 +21,7 @@ ALERT_LOG_PATH = "/cthulhu/alerts.jsonl"
 RULES_PATH = "/cthulhu/alert.rules"
 
 # Colors
+RED = "\033[38;2;255;46;46m"
 GREEN = "\033[38;2;0;255;140m"
 AQUA = "\033[38;2;0;255;183m"
 YELLOW  = "\033[38;2;255;238;0m"
@@ -33,13 +34,13 @@ MAX_LIVE_ALERTS = 200
 
 ENTER_BUTTON = f"""
     {GREEN}┌────────────────────────────────────────┐
-    {GREEN}│  {YELLOW}Press Enter to return to main menu... {GREEN}│
+    {GREEN}│  {WHITE}Press Enter to return to main menu... {GREEN}│
     {GREEN}└────────────────────────────────────────┘
 """
 
 CTRLC_BUTTON = f"""
     {GREEN}┌────────────────────────────────────────┐
-    {GREEN}│  {YELLOW}Press Ctrl+C to return to main menu.  {GREEN}│
+    {GREEN}│  {WHITE}Press Ctrl+C to return to main menu.  {GREEN}│
     {GREEN}└────────────────────────────────────────┘
 """
 
@@ -87,21 +88,21 @@ def print_alert_line(alert: Dict[str, Any]) -> None:
     uid = alert.get("uid") or alert.get("alert_id") or "unknown-uid"
 
     rule = alert.get("rule", {})
-    severity = (rule.get("severity") or "unknown").upper()
+    severity = str((rule.get("severity") or "unknown").upper())
     rule_name = rule.get("name") or "unknown_rule"
     description = rule.get("description") or ""
 
     summary = alert.get("event_summary") or {}
     msg = summary.get("message") or description
 
-    if severity == "high":
-        severity_color = f"[{YELLOW}{severity}]"
-    if severity == "medium":
-        severity_color = f"[{GREEN}{severity}]"
-    if severity == "high":
-        severity_color = f"[{WHITE}{severity}]"
+    if severity == "HIGH":
+        severity_color = f"{RED}[{severity}]"
+    elif severity == "MEDIUM":
+        severity_color = f"{YELLOW}[{severity}]"
+    elif severity == "LOW":
+        severity_color = f"{WHITE}[{severity}]"
     else:
-        severity_color = f"[{GRAY}{severity}]"
+        severity_color = f"{GRAY}[{severity}]"
 
     print(f"{D_GRAY}    {ts} {D_GRAY}[{uid}] {severity_color} {AQUA}[{rule_name}] {GRAY}{msg}")
 
