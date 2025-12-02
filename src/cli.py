@@ -149,7 +149,7 @@ def tail_alerts_live(
     {GREEN}┌──────────────────────────────┐
     {GREEN}│                              │
     {GREEN}│           {AQUA}^(;,;)^ {D_GRAY}v1.0       {GREEN}│
-    {GREEN}│         {YWLLOW}CTHULHU SIEM         {GREEN}│
+    {GREEN}│         {YELLOW}CTHULHU SIEM         {GREEN}│
     {GREEN}│                              │
     {GREEN}│    {GRAY}https://jts.gg/cthulhu    {GREEN}│
     {GREEN}│                              │
@@ -227,7 +227,7 @@ def triage_alert_by_uid(path: str) -> None:
     {GREEN}┌──────────────────────────────┐
     {GREEN}│                              │
     {GREEN}│           {AQUA}^(;,;)^ {D_GRAY}v1.0       {GREEN}│
-    {GREEN}│         {YWLLOW}CTHULHU SIEM         {GREEN}│
+    {GREEN}│         {YELLOW}CTHULHU SIEM         {GREEN}│
     {GREEN}│                              │
     {GREEN}│    {GRAY}https://jts.gg/cthulhu    {GREEN}│
     {GREEN}│                              │
@@ -322,7 +322,7 @@ def view_loaded_rules() -> None:
     {GREEN}┌──────────────────────────────┐
     {GREEN}│                              │
     {GREEN}│           {AQUA}^(;,;)^ {D_GRAY}v1.0       {GREEN}│
-    {GREEN}│         {YWLLOW}CTHULHU SIEM         {GREEN}│
+    {GREEN}│         {YELLOW}CTHULHU SIEM         {GREEN}│
     {GREEN}│                              │
     {GREEN}│    {GRAY}https://jts.gg/cthulhu    {GREEN}│
     {GREEN}│                              │
@@ -364,7 +364,7 @@ def view_search_all_alerts(path: str) -> None:
     {GREEN}┌──────────────────────────────┐
     {GREEN}│                              │
     {GREEN}│           {AQUA}^(;,;)^ {D_GRAY}v1.0       {GREEN}│
-    {GREEN}│         {YWLLOW}CTHULHU SIEM         {GREEN}│
+    {GREEN}│         {YELLOW}CTHULHU SIEM         {GREEN}│
     {GREEN}│                              │
     {GREEN}│    {GRAY}https://jts.gg/cthulhu    {GREEN}│
     {GREEN}│                              │
@@ -410,7 +410,7 @@ def view_alert_stats(path: str) -> None:
     {GREEN}┌──────────────────────────────┐
     {GREEN}│                              │
     {GREEN}│           {AQUA}^(;,;)^ {D_GRAY}v1.0       {GREEN}│
-    {GREEN}│         {YWLLOW}CTHULHU SIEM         {GREEN}│
+    {GREEN}│         {YELLOW}CTHULHU SIEM         {GREEN}│
     {GREEN}│                              │
     {GREEN}│    {GRAY}https://jts.gg/cthulhu    {GREEN}│
     {GREEN}│                              │
@@ -460,7 +460,7 @@ def main_menu() -> None:
     {GREEN}┌──────────────────────────────┐
     {GREEN}│                              │
     {GREEN}│           {AQUA}^(;,;)^ {D_GRAY}v1.0       {GREEN}│
-    {GREEN}│         {YWLLOW}CTHULHU SIEM         {GREEN}│
+    {GREEN}│         {YELLOW}CTHULHU SIEM         {GREEN}│
     {GREEN}│                              │
     {GREEN}│    {GRAY}https://jts.gg/cthulhu    {GREEN}│
     {GREEN}│                              │
