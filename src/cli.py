@@ -94,7 +94,14 @@ def print_alert_line(alert: Dict[str, Any]) -> None:
     summary = alert.get("event_summary") or {}
     msg = summary.get("message") or description
 
-    print(f"{D_GRAY}    {ts} {D_GRAY}[{uid}] {YELLOW}[{severity}] {AQUA}[{rule_name}] {GRAY}{msg}")
+    if severity == "high":
+        severity_color = f"[{YELLOW}{severity}]"
+    if severity == "medium":
+        severity_color = f"[{GREEN}{severity}]"
+    if severity == "high":
+        severity_color = f"[{WHITE}{severity}]"
+
+    print(f"{D_GRAY}    {ts} {D_GRAY}[{uid}] {severity_color} {AQUA}[{rule_name}] {GRAY}{msg}")
 
 
 # Live alert feeds
