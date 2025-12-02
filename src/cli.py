@@ -20,19 +20,27 @@ from rule_handler import load_rules_from_file
 ALERT_LOG_PATH = "/cthulhu/alerts.jsonl"
 RULES_PATH = "/cthulhu/alert.rules"
 
+# Colors
+GREEN = "\033[38;2;0;255;140m"
+AQUA = "\033[38;2;0;255;183m"
+YELLOW  = "\033[38;2;255;238;0m"
+GRAY  = "\033[38;2;122;122;122m"
+D_GRAY  = "\033[38;2;66;66;66m"
+WHITE   = "\033[38;2;255;255;255m"
+
 # How many alerts to keep in memory for live feeds
 MAX_LIVE_ALERTS = 200
 
-ENTER_BUTTON = """
-    ┌───────────────────────────────────────┐
-    │ Press Enter to return to main menu... │
-    └───────────────────────────────────────┘
+ENTER_BUTTON = f"""
+    {GREEN}┌───────────────────────────────────────┐
+    {GREEN}│ {YELLOW}Press Enter to return to main menu... {GREEN}│
+    {GREEN}└───────────────────────────────────────┘
 """
 
-CTRLC_BUTTON = """
-    ┌───────────────────────────────────────┐
-    │ Press Ctrl+C to return to main menu.  │
-    └───────────────────────────────────────┘
+CTRLC_BUTTON = f"""
+    {GREEN}┌───────────────────────────────────────┐
+    {GREEN}│ {YELLOW}Press Ctrl+C to return to main menu.  {GREEN}│
+    {GREEN}└───────────────────────────────────────┘
 """
 
 
@@ -86,7 +94,7 @@ def print_alert_line(alert: Dict[str, Any]) -> None:
     summary = alert.get("event_summary") or {}
     msg = summary.get("message") or description
 
-    print(f"    {ts} [{uid}] [{severity}] [{rule_name}] {msg}")
+    print(f"{D_GRAY}    {ts} {D_GRAY}[{uid}] {YELLOW}[{severity}] {AQUA}[{rule_name}] {GRAY}{msg}")
 
 
 # Live alert feeds
@@ -99,7 +107,7 @@ def tail_alerts_live(
     Live alert feed with optional severity filter.
     """
     if not os.path.exists(path):
-        print(f"    Alert log file not found: {path}")
+        print(f"{GRAY}    Alert log file not found: {path}")
         input(ENTER_BUTTON)
         return
 
@@ -138,17 +146,17 @@ def tail_alerts_live(
 
                 clear_screen()
                 print(f"""
-    ┌──────────────────────────────┐
-    │                              │
-    │           ^(;,;)^ v1.0       │
-    │         CTHULHU SIEM         │
-    │                              │
-    │    https://jts.gg/cthulhu    │
-    │                              │
-    │        ALERT LIVE FEED       │
-    └──────────────────────────────┘""")
+    {GREEN}┌──────────────────────────────┐
+    {GREEN}│                              │
+    {GREEN}│           {AQUA}^(;,;)^ {D_GRAY}v1.0       {GREEN}│
+    {GREEN}│         {YWLLOW}CTHULHU SIEM         {GREEN}│
+    {GREEN}│                              │
+    {GREEN}│    {GRAY}https://jts.gg/cthulhu    {GREEN}│
+    {GREEN}│                              │
+    {GREEN}│        {WHITE}ALERT LIVE FEED       {GREEN}│
+    {GREEN}└──────────────────────────────┘""")
                 if severity_filter_norm:
-                    print(f"\n    [FILTER] {severity_filter_norm}")
+                    print(f"\n    {YELLOW}[FILTER]{GRAY} {severity_filter_norm}")
                 print(CTRLC_BUTTON)
 
                 displayed = 0
@@ -162,7 +170,7 @@ def tail_alerts_live(
                     displayed += 1
 
                 if displayed == 0:
-                    print("    (no alerts to display yet)")
+                    print("{GRAY}    (no alerts to display yet)")
         except KeyboardInterrupt:
             pass
 
@@ -196,9 +204,9 @@ def triage_alert_by_uid(path: str) -> None:
     Prompt the user for an alert UID, search for it in the alerts file,
     and display full details if found.
     """
-    uid = input("    Enter Alert UID > ").strip()
+    uid = input("{GREEN}    Enter Alert UID > ").strip()
     if not uid:
-        print("    No UID entered.")
+        print("{GRAY}    No UID entered.")
         input(ENTER_BUTTON)
         return
 
@@ -206,7 +214,7 @@ def triage_alert_by_uid(path: str) -> None:
 
     clear_screen()
     if alert is None:
-        print(f"    No alert found with UID: {uid}")
+        print(f"{GRAY}    No alert found with UID: {uid}")
         input(ENTER_BUTTON)
         return
 
@@ -216,39 +224,39 @@ def triage_alert_by_uid(path: str) -> None:
     event = alert.get("event", {})
 
     print(f"""
-    ┌──────────────────────────────┐
-    │                              │
-    │           ^(;,;)^ v1.0       │
-    │         CTHULHU SIEM         │
-    │                              │
-    │    https://jts.gg/cthulhu    │
-    │                              │
-    │       ALERT INFORMATION      │
-    └──────────────────────────────┘
+    {GREEN}┌──────────────────────────────┐
+    {GREEN}│                              │
+    {GREEN}│           {AQUA}^(;,;)^ {D_GRAY}v1.0       {GREEN}│
+    {GREEN}│         {YWLLOW}CTHULHU SIEM         {GREEN}│
+    {GREEN}│                              │
+    {GREEN}│    {GRAY}https://jts.gg/cthulhu    {GREEN}│
+    {GREEN}│                              │
+    {GREEN}│       {WHITE}ALERT INFORMATION      {GREEN}│
+    {GREEN}└──────────────────────────────┘
 
-    Alert UID      : {alert.get('uid') or alert.get('alert_id')}
-    Alert Time     : {alert.get('alert_timestamp')}
-    Rule Name      : {rule.get('name')}
-    Severity       : {rule.get('severity')}
-    Description    : {rule.get('description')}
+    {GRAY}Alert UID      : {YELLOW}{alert.get('uid') or alert.get('alert_id')}
+    {GRAY}Alert Time     : {WHITE}{alert.get('alert_timestamp')}
+    {GRAY}Rule Name      : {AQUA}{rule.get('name')}
+    {GRAY}Severity       : {YELLOW}{rule.get('severity')}
+    {GRAY}Description    : {WHITE}{rule.get('description')}
 
-    ┌──────────────────────────────┐
-    │          EVENT META          │
-    └──────────────────────────────┘
+    {GREEN}┌──────────────────────────────┐
+    {GREEN}│          {YELLOW}EVENT META          {GREEN}│
+    {GREEN}└──────────────────────────────┘
 
-    {json.dumps(event_meta, indent=2, sort_keys=True)}
+    {GRAY}{json.dumps(event_meta, indent=2, sort_keys=True)}
 
-    ┌──────────────────────────────┐
-    │        EVENT SUMMARY         │
-    └──────────────────────────────┘
+    {GREEN}┌──────────────────────────────┐
+    {GREEN}│        {YELLOW}EVENT SUMMARY         {GREEN}│
+    {GREEN}└──────────────────────────────┘
 
-    {json.dumps(event_summary, indent=2, sort_keys=True)}
+    {GRAY}{json.dumps(event_summary, indent=2, sort_keys=True)}
 
-    ┌──────────────────────────────┐
-    │         FULL SUMMARY         │
-    └──────────────────────────────┘
+    {GREEN}┌──────────────────────────────┐
+    {GREEN}│         {YELLOW}FULL SUMMARY         {GREEN}│
+    {GREEN}└──────────────────────────────┘
 
-    {json.dumps(event, indent=2, sort_keys=True)}""")
+    {GRAY}{json.dumps(event, indent=2, sort_keys=True)}""")
     input(ENTER_BUTTON)
 
 
@@ -257,9 +265,9 @@ def export_alert_by_uid(path: str) -> None:
     Prompt for an alert UID and export that alert as pretty JSON to a file.
     Default export path: ./alert_<uid>.json
     """
-    uid = input("    Enter alert UID to export > ").strip()
+    uid = input("{GREEN}    Enter alert UID to export > ").strip()
     if not uid:
-        print("    No UID entered.")
+        print("{GRAY}    No UID entered.")
         input(ENTER_BUTTON)
         return
 
@@ -267,13 +275,13 @@ def export_alert_by_uid(path: str) -> None:
     clear_screen()
 
     if alert is None:
-        print(f"    No alert found with UID: {uid}")
+        print(f"{GRAY}    No alert found with UID: {uid}")
         input(ENTER_BUTTON)
         return
 
     default_path = f"./alert_{uid}.json"
-    print(f"    Default export path: {default_path}")
-    out_path = input("    Enter export path (leave blank for default) > ").strip()
+    print(f"{GRAY}    Default export path: {default_path}")
+    out_path = input("{GREEN}    Enter export path (leave blank for default) > ").strip()
     if not out_path:
         out_path = default_path
 
@@ -284,9 +292,9 @@ def export_alert_by_uid(path: str) -> None:
     try:
         with open(out_path, "w", encoding="utf-8") as f:
             json.dump(alert, f, indent=2, sort_keys=True)
-        print(f"    Alert {uid} exported to: {out_path}")
+        print(f"{GRAY}    Alert {uid} exported to: {out_path}")
     except Exception as e:
-        print(f"    Failed to export alert: {e}")
+        print(f"{GRAY}    Failed to export alert: {e}")
 
     input(ENTER_BUTTON)
 
@@ -298,32 +306,32 @@ def view_loaded_rules() -> None:
     Load and display all rule names from the rules file.
     """
     if not os.path.exists(RULES_PATH):
-        print(f"    Rules file not found: {RULES_PATH}")
+        print(f"{GRAY}    Rules file not found: {RULES_PATH}")
         input(ENTER_BUTTON)
         return
 
     try:
         rules = load_rules_from_file(RULES_PATH)
     except Exception as e:
-        print(f"    Failed to load rules: {e}")
+        print(f"{GRAY}    Failed to load rules: {e}")
         input(ENTER_BUTTON)
         return
 
     clear_screen()
     print(f"""
-    ┌──────────────────────────────┐
-    │                              │
-    │           ^(;,;)^ v1.0       │
-    │         CTHULHU SIEM         │
-    │                              │
-    │    https://jts.gg/cthulhu    │
-    │                              │
-    │         LOADED RULES         │
-    └──────────────────────────────┘
+    {GREEN}┌──────────────────────────────┐
+    {GREEN}│                              │
+    {GREEN}│           {AQUA}^(;,;)^ {D_GRAY}v1.0       {GREEN}│
+    {GREEN}│         {YWLLOW}CTHULHU SIEM         {GREEN}│
+    {GREEN}│                              │
+    {GREEN}│    {GRAY}https://jts.gg/cthulhu    {GREEN}│
+    {GREEN}│                              │
+    {GREEN}│         {WHITE}LOADED RULES         {GREEN}│
+    {GREEN}└──────────────────────────────┘
     """)
 
     if not rules:
-        print("    (no rules loaded)")
+        print("{GRAY}    (no rules loaded)")
         input(ENTER_BUTTON)
         return
 
@@ -333,7 +341,7 @@ def view_loaded_rules() -> None:
         name = r["name"]
         severity = r["severity"]
         desc = r["description"]
-        print(f"    {name} ({severity}) - {desc}")
+        print(f"    {AQUA}{name} {YELLOW}({severity}) {GRAY}- {desc}")
 
     input(ENTER_BUTTON)
 
@@ -344,30 +352,30 @@ def view_search_all_alerts(path: str) -> None:
     Optional rule-name substring filter.
     """
     if not os.path.exists(path):
-        print(f"    Alert log file not found: {path}")
+        print(f"{GRAY}    Alert log file not found: {path}")
         input(ENTER_BUTTON)
         return
 
-    filter_str = input("    Enter rule name filter (leave blank for all) > ").strip().lower()
+    filter_str = input("{GREEN}    Enter rule name filter (leave blank for all) > ").strip().lower()
     alerts = read_alerts_from_file(path)
 
     clear_screen()
     print(f"""
-    ┌──────────────────────────────┐
-    │                              │
-    │           ^(;,;)^ v1.0       │
-    │         CTHULHU SIEM         │
-    │                              │
-    │    https://jts.gg/cthulhu    │
-    │                              │
-    │          ALL ALERTS          │
-    └──────────────────────────────┘
+    {GREEN}┌──────────────────────────────┐
+    {GREEN}│                              │
+    {GREEN}│           {AQUA}^(;,;)^ {D_GRAY}v1.0       {GREEN}│
+    {GREEN}│         {YWLLOW}CTHULHU SIEM         {GREEN}│
+    {GREEN}│                              │
+    {GREEN}│    {GRAY}https://jts.gg/cthulhu    {GREEN}│
+    {GREEN}│                              │
+    {GREEN}│          {WHITE}ALL ALERTS          {GREEN}│
+    {GREEN}└──────────────────────────────┘
     """)
     if filter_str:
-        print(f"    [FILTER] rule name contains {filter_str}")
+        print(f"    {YELLOW}[FILTER]{GRAY} rule name contains {AQUA}{filter_str}")
 
     if not alerts:
-        print("    (no alerts found)")
+        print("{GRAY}    (no alerts found)")
         input(ENTER_BUTTON)
         return
 
@@ -381,7 +389,7 @@ def view_search_all_alerts(path: str) -> None:
         count += 1
 
     if count == 0:
-        print("    (no alerts match the filter)")
+        print("{GRAY}    (no alerts match the filter)")
 
     input(ENTER_BUTTON)
 
@@ -399,19 +407,19 @@ def view_alert_stats(path: str) -> None:
 
     clear_screen()
     print(f"""
-    ┌──────────────────────────────┐
-    │                              │
-    │           ^(;,;)^ v1.0       │
-    │         CTHULHU SIEM         │
-    │                              │
-    │    https://jts.gg/cthulhu    │
-    │                              │
-    │          ALERT STATS         │
-    └──────────────────────────────┘
+    {GREEN}┌──────────────────────────────┐
+    {GREEN}│                              │
+    {GREEN}│           {AQUA}^(;,;)^ {D_GRAY}v1.0       {GREEN}│
+    {GREEN}│         {YWLLOW}CTHULHU SIEM         {GREEN}│
+    {GREEN}│                              │
+    {GREEN}│    {GRAY}https://jts.gg/cthulhu    {GREEN}│
+    {GREEN}│                              │
+    {GREEN}│          {WHITE}ALERT STATS         {GREEN}│
+    {GREEN}└──────────────────────────────┘
     """)
 
     if not alerts:
-        print("    (no alerts found)")
+        print("{GRAY}    (no alerts found)")
         input(ENTER_BUTTON)
         return
 
@@ -427,15 +435,15 @@ def view_alert_stats(path: str) -> None:
         sev_counter[severity] += 1
         rule_counter[name] += 1
 
-    print(f"    Total Alerts: {total}")
+    print(f"{AQUA}    TOTAL: {YELLOW}{total}")
 
-    print("    Alerts by Severity:")
+    print("{GREEN}    SEVERITY:")
     for sev, count in sorted(sev_counter.items(), key=lambda x: (-x[1], x[0])):
-        print(f"      {sev}: {count}")
+        print(f"{WHITE}      {sev}: {YELLOW}{count}")
 
-    print("    Alerts by Rule:")
+    print("{GREEN}    RULE TYPE:")
     for name, count in sorted(rule_counter.items(), key=lambda x: (-x[1], x[0])):
-        print(f"      {name}: {count}")
+        print(f"{WHITE}      {name}: {YELLOW}{count}")
 
     input(ENTER_BUTTON)
 
@@ -449,34 +457,34 @@ def main_menu() -> None:
     while True:
         clear_screen()
         print(f"""
-    ┌──────────────────────────────┐
-    │                              │
-    │           ^(;,;)^ v1.0       │
-    │         CTHULHU SIEM         │
-    │                              │
-    │    https://jts.gg/cthulhu    │
-    │                              │
-    └──────────────────────────────┘
+    {GREEN}┌──────────────────────────────┐
+    {GREEN}│                              │
+    {GREEN}│           {AQUA}^(;,;)^ {D_GRAY}v1.0       {GREEN}│
+    {GREEN}│         {YWLLOW}CTHULHU SIEM         {GREEN}│
+    {GREEN}│                              │
+    {GREEN}│    {GRAY}https://jts.gg/cthulhu    {GREEN}│
+    {GREEN}│                              │
+    {GREEN}└──────────────────────────────┘
 
-    1. LIVE ALERT FEED
-    2. FILTERED LIVE ALERT FEED
-    3. ALERT TRIAGE
-    4. VIEW/SEARCH ALL ALERTS
-    5. EXPORT ALERT
-    6. ALERT STATS
-    7. LOADED RULES
-    q. QUIT
+    {YELLOW}1. {AQUA}LIVE ALERT FEED
+    {YELLOW}2. {WHITE}FILTERED LIVE ALERT FEED
+    {YELLOW}3. {YELLOW}ALERT TRIAGE
+    {YELLOW}4. {WHITE}VIEW/SEARCH ALL ALERTS
+    {YELLOW}5. {WHITE}EXPORT ALERT
+    {YELLOW}6. {WHITE}ALERT STATS
+    {YELLOW}7. {WHITE}LOADED RULES
+    {YELLOW}q. {WHITE}QUIT
     """)
-        choice = input("    Select Action > ").strip().lower()
+        choice = input("{GREEN}    Select Action > ").strip().lower()
 
         if choice == "1":
             tail_alerts_live(ALERT_LOG_PATH)
         elif choice == "2":
-            sev = input("    Enter severity (e.g. low, medium, high) > ").strip()
+            sev = input("{GREEN}    Enter severity (e.g. low, medium, high) > ").strip()
             if sev:
                 tail_alerts_live(ALERT_LOG_PATH, severity_filter=sev)
             else:
-                print("    No severity provided.")
+                print("{GRAY}    No severity provided.")
                 input(ENTER_BUTTON)
         elif choice == "3":
             triage_alert_by_uid(ALERT_LOG_PATH)
@@ -489,10 +497,10 @@ def main_menu() -> None:
         elif choice == "7":
             view_loaded_rules()
         elif choice in ("q", "quit", "exit"):
-            print("    Exiting SIEM alert console.")
+            print("{GRAY}    Exiting SIEM alert console.")
             break
         else:
-            print(f"    Invalid choice: {choice!r}")
+            print(f"{GRAY}    Invalid choice: {choice!r}")
             input(ENTER_BUTTON)
 
 
