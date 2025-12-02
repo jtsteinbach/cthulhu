@@ -1,8 +1,6 @@
 """
 ingest_events.py
 
-Event ingestion and normalization for a Python-based Linux SIEM.
-
 Sources:
     * auditd   (typically /var/log/audit/audit.log)
     * journald (typically via `journalctl -o json`)
@@ -131,7 +129,6 @@ def _strip_auditd_value(v: str) -> str:
 def parse_auditd_record_line(line: str) -> Optional[Dict[str, Any]]:
     """
     Parse a single auditd record line into a structured dict.
-
     Returns None if the line doesn't match the expected header.
 
     Example return:
@@ -191,7 +188,6 @@ def parse_auditd_record_line(line: str) -> Optional[Dict[str, Any]]:
 def parse_auditd_record_stream(lines: Iterable[str]) -> Iterable[Dict[str, Any]]:
     """
     Generator: parse a stream of auditd lines into individual records.
-
     Each yielded dict corresponds to exactly one matching audit.log line.
     """
     for line in lines:
@@ -208,7 +204,6 @@ def parse_auditd_record_stream(lines: Iterable[str]) -> Iterable[Dict[str, Any]]
 def build_auditd_event(records: List[Dict[str, Any]]) -> Dict[str, Any]:
     """
     Build a high-level auditd event from all records sharing the same serial.
-
     This layer:
         - Exposes syscall-centric fields (uid, pid, exe, command, success, etc.).
         - Gathers cwd and file paths from CWD/PATH records.
@@ -340,12 +335,11 @@ def build_auditd_events_from_stream(
 ) -> Iterable[Dict[str, Any]]:
     """
     High-level generator:
-
         audit.log lines -> rich auditd events.
 
     Records are grouped by "serial" (audit(…:serial):). A new event is emitted
     when the serial changes.
-
+    
     Example:
         with open("/var/log/audit/audit.log") as f:
             for event in build_auditd_events_from_stream(f):
@@ -377,7 +371,6 @@ def build_auditd_events_from_stream(
 def parse_journald_event(event: Any) -> Dict[str, Any]:
     """
     Parse a single journald event (JSON string or dict) into a normalized dict.
-
     We keep ALL original metadata in the `fields` and `raw` dicts (no data loss).
 
     Returned schema:
@@ -485,7 +478,6 @@ def _classify_journald_category(
 def parse_journald_stream(lines: Iterable[str]) -> Iterable[Dict[str, Any]]:
     """
     Generator: parse a stream of journald JSON lines into normalized events.
-
     Typical producer: `journalctl -o json -f`
     """
     for line in lines:
