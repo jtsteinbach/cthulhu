@@ -445,15 +445,15 @@ def view_alert_stats(path: str) -> None:
         sev_counter[severity] += 1
         rule_counter[name] += 1
 
-    print(f"{AQUA}    TOTAL: {YELLOW}{total}")
+    print(f"{AQUA}    TOTAL {RED}({total})\n")
 
     print(f"{GREEN}    SEVERITY:")
     for sev, count in sorted(sev_counter.items(), key=lambda x: (-x[1], x[0])):
-        print(f"{WHITE}      {sev}: {YELLOW}{count}")
+        print(f"{GRAY}      {sev} {YELLOW}({count})")
 
     print(f"{GREEN}    RULE TYPE:")
     for name, count in sorted(rule_counter.items(), key=lambda x: (-x[1], x[0])):
-        print(f"{WHITE}      {name}: {YELLOW}{count}")
+        print(f"{GRAY}      {name} {YELLOW}({count})")
 
     input(ENTER_BUTTON)
 
@@ -478,7 +478,7 @@ def main_menu() -> None:
 
     {YELLOW}1. {AQUA}LIVE ALERT FEED
     {YELLOW}2. {GRAY}FILTERED LIVE ALERT FEED
-    {YELLOW}3. {AQUA}ALERT TRIAGE
+    {YELLOW}3. {GRAY}ALERT TRIAGE
     {YELLOW}4. {GRAY}VIEW/SEARCH ALL ALERTS
     {YELLOW}5. {GRAY}EXPORT ALERT
     {YELLOW}6. {GRAY}ALERT STATS
