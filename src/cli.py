@@ -170,7 +170,7 @@ def tail_alerts_live(
                     displayed += 1
 
                 if displayed == 0:
-                    print("{GRAY}    (no alerts to display yet)")
+                    print(f"{GRAY}    (no alerts to display yet)")
         except KeyboardInterrupt:
             pass
 
@@ -206,7 +206,7 @@ def triage_alert_by_uid(path: str) -> None:
     """
     uid = input(f"{GREEN}    Enter Alert UID > ").strip()
     if not uid:
-        print("{GRAY}    No UID entered.")
+        print(f"{GRAY}    No UID entered.")
         input(ENTER_BUTTON)
         return
 
@@ -267,7 +267,7 @@ def export_alert_by_uid(path: str) -> None:
     """
     uid = input(f"{GREEN}    Enter alert UID to export > ").strip()
     if not uid:
-        print("{GRAY}    No UID entered.")
+        print(f"{GRAY}    No UID entered.")
         input(ENTER_BUTTON)
         return
 
@@ -331,7 +331,7 @@ def view_loaded_rules() -> None:
     """)
 
     if not rules:
-        print("{GRAY}    (no rules loaded)")
+        print(f"{GRAY}    (no rules loaded)")
         input(ENTER_BUTTON)
         return
 
@@ -375,7 +375,7 @@ def view_search_all_alerts(path: str) -> None:
         print(f"    {YELLOW}[FILTER]{GRAY} rule name contains {AQUA}{filter_str}")
 
     if not alerts:
-        print("{GRAY}    (no alerts found)")
+        print(f"{GRAY}    (no alerts found)")
         input(ENTER_BUTTON)
         return
 
@@ -389,7 +389,7 @@ def view_search_all_alerts(path: str) -> None:
         count += 1
 
     if count == 0:
-        print("{GRAY}    (no alerts match the filter)")
+        print(f"{GRAY}    (no alerts match the filter)")
 
     input(ENTER_BUTTON)
 
@@ -419,7 +419,7 @@ def view_alert_stats(path: str) -> None:
     """)
 
     if not alerts:
-        print("{GRAY}    (no alerts found)")
+        print(f"{GRAY}    (no alerts found)")
         input(ENTER_BUTTON)
         return
 
@@ -437,11 +437,11 @@ def view_alert_stats(path: str) -> None:
 
     print(f"{AQUA}    TOTAL: {YELLOW}{total}")
 
-    print("{GREEN}    SEVERITY:")
+    print(f"{GREEN}    SEVERITY:")
     for sev, count in sorted(sev_counter.items(), key=lambda x: (-x[1], x[0])):
         print(f"{WHITE}      {sev}: {YELLOW}{count}")
 
-    print("{GREEN}    RULE TYPE:")
+    print(f"{GREEN}    RULE TYPE:")
     for name, count in sorted(rule_counter.items(), key=lambda x: (-x[1], x[0])):
         print(f"{WHITE}      {name}: {YELLOW}{count}")
 
@@ -484,7 +484,7 @@ def main_menu() -> None:
             if sev:
                 tail_alerts_live(ALERT_LOG_PATH, severity_filter=sev)
             else:
-                print("{GRAY}    No severity provided.")
+                print(f"{GRAY}    No severity provided.")
                 input(ENTER_BUTTON)
         elif choice == "3":
             triage_alert_by_uid(ALERT_LOG_PATH)
@@ -497,7 +497,7 @@ def main_menu() -> None:
         elif choice == "7":
             view_loaded_rules()
         elif choice in ("q", "quit", "exit"):
-            print("{GRAY}    Exiting SIEM alert console.")
+            print(f"{GRAY}    Exiting SIEM alert console.")
             break
         else:
             print(f"{GRAY}    Invalid choice: {choice!r}")
