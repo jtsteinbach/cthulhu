@@ -204,7 +204,7 @@ def triage_alert_by_uid(path: str) -> None:
     Prompt the user for an alert UID, search for it in the alerts file,
     and display full details if found.
     """
-    uid = input("{GREEN}    Enter Alert UID > ").strip()
+    uid = input(f"{GREEN}    Enter Alert UID > ").strip()
     if not uid:
         print("{GRAY}    No UID entered.")
         input(ENTER_BUTTON)
@@ -265,7 +265,7 @@ def export_alert_by_uid(path: str) -> None:
     Prompt for an alert UID and export that alert as pretty JSON to a file.
     Default export path: ./alert_<uid>.json
     """
-    uid = input("{GREEN}    Enter alert UID to export > ").strip()
+    uid = input(f"{GREEN}    Enter alert UID to export > ").strip()
     if not uid:
         print("{GRAY}    No UID entered.")
         input(ENTER_BUTTON)
@@ -281,7 +281,7 @@ def export_alert_by_uid(path: str) -> None:
 
     default_path = f"./alert_{uid}.json"
     print(f"{GRAY}    Default export path: {default_path}")
-    out_path = input("{GREEN}    Enter export path (leave blank for default) > ").strip()
+    out_path = input(f"{GREEN}    Enter export path (leave blank for default) > ").strip()
     if not out_path:
         out_path = default_path
 
@@ -356,7 +356,7 @@ def view_search_all_alerts(path: str) -> None:
         input(ENTER_BUTTON)
         return
 
-    filter_str = input("{GREEN}    Enter rule name filter (leave blank for all) > ").strip().lower()
+    filter_str = input(f"{GREEN}    Enter rule name filter (leave blank for all) > ").strip().lower()
     alerts = read_alerts_from_file(path)
 
     clear_screen()
@@ -467,20 +467,20 @@ def main_menu() -> None:
     {GREEN}└──────────────────────────────┘
 
     {YELLOW}1. {AQUA}LIVE ALERT FEED
-    {YELLOW}2. {WHITE}FILTERED LIVE ALERT FEED
-    {YELLOW}3. {YELLOW}ALERT TRIAGE
-    {YELLOW}4. {WHITE}VIEW/SEARCH ALL ALERTS
-    {YELLOW}5. {WHITE}EXPORT ALERT
-    {YELLOW}6. {WHITE}ALERT STATS
-    {YELLOW}7. {WHITE}LOADED RULES
-    {YELLOW}q. {WHITE}QUIT
+    {YELLOW}2. {GRAY}FILTERED LIVE ALERT FEED
+    {YELLOW}3. {AQUA}ALERT TRIAGE
+    {YELLOW}4. {GRAY}VIEW/SEARCH ALL ALERTS
+    {YELLOW}5. {GRAY}EXPORT ALERT
+    {YELLOW}6. {GRAY}ALERT STATS
+    {YELLOW}7. {GRAY}LOADED RULES
+    {YELLOW}q. {GRAY}QUIT
     """)
-        choice = input("{GREEN}    Select Action > ").strip().lower()
+        choice = input(f"{GREEN}    Select Action > ").strip().lower()
 
         if choice == "1":
             tail_alerts_live(ALERT_LOG_PATH)
         elif choice == "2":
-            sev = input("{GREEN}    Enter severity (e.g. low, medium, high) > ").strip()
+            sev = input(f"{GREEN}    Enter severity (e.g. low, medium, high) > ").strip()
             if sev:
                 tail_alerts_live(ALERT_LOG_PATH, severity_filter=sev)
             else:
