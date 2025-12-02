@@ -100,7 +100,7 @@ def print_alert_line(alert: Dict[str, Any]) -> None:
         severity_color = f"[{GREEN}{severity}]"
     if severity == "high":
         severity_color = f"[{WHITE}{severity}]"
-    elif:
+    else:
         severity_color = f"[{GRAY}{severity}]"
 
     print(f"{D_GRAY}    {ts} {D_GRAY}[{uid}] {severity_color} {AQUA}[{rule_name}] {GRAY}{msg}")
