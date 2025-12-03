@@ -23,7 +23,7 @@ from alert_handler import handle_matches
 # Configuration
 
 # Paths (keep consistent with cli.py defaults)
-ALERT_LOG_PATH = "./alerts.jsonl"
+ALERT_LOG_PATH = "/cthulhu/alerts.jsonl"
 RULES_PATH = "/cthulhu/alert.rules"
 AUDIT_LOG_PATH = "/var/log/audit/audit.log"
 
