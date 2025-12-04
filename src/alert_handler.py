@@ -16,7 +16,7 @@ from typing import Any, Dict, List
 def _pst_timestamp() -> str:
     """Return current PST time"""
     pacific = zoneinfo.ZoneInfo("America/Los_Angeles")
-    return datetime.now(pacific).strftime("%Y-%m-%d %I:%M:%S %p %Z")
+    return datetime.now(pacific).strftime("%m-%d-%Y %I:%M:%S %p %Z")
 
 
 def _generate_uuid() -> str:
