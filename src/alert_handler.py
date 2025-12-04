@@ -21,7 +21,7 @@ def _pst_timestamp() -> str:
 
 def _generate_uuid() -> str:
     """Generate unique id"""
-    return os.urandom(12).hex().upper()
+    return os.urandom(6).hex().upper()
 
 
 def _build_event_meta(event: Dict[str, Any]) -> Dict[str, Any]:
