@@ -140,12 +140,14 @@ def tail_alerts_live(
             buffer.append(alert)
 
         try:
+            constant = False
             while True:
                 where = f.tell()
                 new_line = f.readline()
-                if not new_line:
-                    time.sleep(1.0)
+                if constant and not new_line:
+                    time.sleep(30.0)
                 else:
+                    constant = True
                     new_line = new_line.strip()
                     if new_line:
                         try:
@@ -153,7 +155,7 @@ def tail_alerts_live(
                             buffer.append(alert)
                         except json.JSONDecodeError:
                             pass
-
+                            
                 clear_screen()
                 print(f"""
     {GREEN}┌──────────────────────────────┐
