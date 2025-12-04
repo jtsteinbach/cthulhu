@@ -6,16 +6,22 @@ from __future__ import annotations
 
 import json
 import os
-import uuid
+import zoneinfo
 from datetime import datetime, timezone
 from typing import Any, Dict, List
 
 
 # Internal helpers
 
-def _iso_now_utc() -> str:
-    """Return current UTC time as an ISO 8601 string."""
-    return datetime.now(timezone.utc).isoformat()
+def _pst_timestamp() -> str:
+    """Return current PST time"""
+    pacific = zoneinfo.ZoneInfo("America/Los_Angeles")
+    return datetime.now(pacific).strftime("%Y-%m-%d %I:%M:%S %p %Z")
+
+
+def _generate_uuid() -> str:
+    """Generate unique id"""
+    return os.urandom(12).hex().upper()
 
 
 def _build_event_meta(event: Dict[str, Any]) -> Dict[str, Any]:
@@ -117,8 +123,8 @@ def build_alert(event: Dict[str, Any], match: Dict[str, Any]) -> Dict[str, Any]:
             "description": "<description>",
         }
     """
-    alert_uuid = str(uuid.uuid4())
-    alert_timestamp = _iso_now_utc()
+    alert_uuid = str(_generate_uuid())
+    alert_timestamp = _pst_timestamp()
 
     rule_info = {
         "name": match.get("rule"),
