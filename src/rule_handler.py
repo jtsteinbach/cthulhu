@@ -89,7 +89,7 @@ def _normalize_condition_line(line: str) -> str:
     expr = re.sub(r"\bis\s+null\b", "is None", expr)
 
     # LHS token: allow dotted access like event.message
-    LHS = r"([A-Za-z_][A-Za-z0-9_\.]*)"
+    LHS = r"(\(*\s*[A-Za-z_][A-Za-z0-9_\.]*\s*\)*)"
 
     # NEGATED string operators
     expr = re.sub(rf"{LHS}\s+!contains\s+(.+)", r"not _contains(\1, \2)", expr)
