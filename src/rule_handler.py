@@ -63,49 +63,51 @@ def _endswith(value: Any, suffix: Any) -> bool:
 
 def _normalize_condition_line(line: str) -> str:
     """
-    Normalize a single condition line into a safe Python expression string.
-
-    Transformations:
-        - true/false/null -> True/False/None
-        - "is null" / "is not null" -> "is None" / "is not None"
-        - infix string ops:
-            X contains Y      -> _contains(X, Y)
-            X !contains Y     -> not _contains(X, Y)
-            X startswith Y    -> _startswith(X, Y)
-            X !startswith Y   -> not _startswith(X, Y)
-            X endswith Y      -> _endswith(X, Y)
-            X !endswith Y     -> not _endswith(X, Y)
+    Normalize a single condition line into safe Python. This version uses a
+    tokenization approach so we NEVER accidentally merge `or` with `_contains`
+    or `_endswith`.
     """
 
     expr = line.strip()
 
-    # Replace null/true/false
+    # Normalize literals
     expr = re.sub(r"\btrue\b", "True", expr)
     expr = re.sub(r"\bfalse\b", "False", expr)
     expr = re.sub(r"\bnull\b", "None", expr)
-
-    # is null / is not null
     expr = re.sub(r"\bis\s+not\s+null\b", "is not None", expr)
     expr = re.sub(r"\bis\s+null\b", "is None", expr)
 
-    # LHS token: allow dotted access like event.message
+    # ---- TOKENIZE BY BOOLEAN OPERATORS ----
+    parts = re.split(r'\b(and|or)\b', expr)
+
+    normalized_parts = []
+
+    # LHS pattern allowing parentheses
     LHS = r"(\(*\s*[A-Za-z_][A-Za-z0-9_\.]*\s*\)*)"
 
-    # NEGATED string operators
-    expr = re.sub(rf"{LHS}\s+!contains\s+(.+)", r"not _contains(\1, \2)", expr)
-    expr = re.sub(rf"{LHS}\s+!startswith\s+(.+)", r"not _startswith(\1, \2)", expr)
-    expr = re.sub(rf"{LHS}\s+!endswith\s+(.+)", r"not _endswith(\1, \2)", expr)
+    for part in parts:
+        stripped = part.strip()
 
-    # Helper: convert infix op → function call
-    def _infix_to_func(pattern: str, func_name: str, s: str) -> str:
-        return re.sub(pattern, rf"{func_name}(\1, \2)", s)
+        # Boolean operators pass through unchanged
+        if stripped in ("and", "or"):
+            normalized_parts.append(stripped)
+            continue
 
-    # POSITIVE string operators
-    expr = _infix_to_func(rf"{LHS}\s+contains\s+(.+)", "_contains", expr)
-    expr = _infix_to_func(rf"{LHS}\s+startswith\s+(.+)", "_startswith", expr)
-    expr = _infix_to_func(rf"{LHS}\s+endswith\s+(.+)", "_endswith", expr)
+        # NEGATED operators
+        part = re.sub(rf"{LHS}\s+!contains\s+(.*)", r"not _contains(\1, \2)", part)
+        part = re.sub(rf"{LHS}\s+!startswith\s+(.*)", r"not _startswith(\1, \2)", part)
+        part = re.sub(rf"{LHS}\s+!endswith\s+(.*)", r"not _endswith(\1, \2)", part)
 
-    return expr
+        # POSITIVE operators
+        part = re.sub(rf"{LHS}\s+contains\s+(.*)", r"_contains(\1, \2)", part)
+        part = re.sub(rf"{LHS}\s+startswith\s+(.*)", r"_startswith(\1, \2)", part)
+        part = re.sub(rf"{LHS}\s+endswith\s+(.*)", r"_endswith(\1, \2)", part)
+
+        normalized_parts.append(part)
+
+    # Reassemble with proper spacing
+    final_expr = " ".join(normalized_parts).strip()
+    return final_expr
 
 
 def _compile_rule_expression(cond_lines: List[str]) -> Callable[[Dict[str, Any]], bool]:
