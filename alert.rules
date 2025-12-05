@@ -1,1 +1,719 @@
+reverse_shell_netcat(high)
+    | "Netcat reverse shell execution (likely reverse shell)"
+    : source == "auditd"
+    : success == True
+    : (_endswith(exe, "/nc") or _endswith(exe, "/ncat") or _endswith(exe, "/netcat"))
+    : (_contains(command, " -e ") or _contains(command, " -c ") or _contains(command, "/bin/bash") or _contains(command, "/bin/sh"))
 
+reverse_shell_bash_dev_tcp(high)
+    | "Bash reverse shell using /dev/tcp"
+    : source == "auditd"
+    : success == True
+    : _endswith(exe, "/bash")
+    : _contains(command, "/dev/tcp")
+    : _contains(command, " -i")
+
+reverse_shell_python_socket(high)
+    | "Python reverse shell using socket connect and shell"
+    : source == "auditd"
+    : success == True
+    : (_endswith(exe, "/python") or _endswith(exe, "/python3"))
+    : _contains(command, "import socket")
+    : _contains(command, "connect")
+    : (_contains(command, "bash") or _contains(command, "sh"))
+
+reverse_shell_perl(high)
+    | "Perl reverse shell pattern"
+    : source == "auditd"
+    : success == True
+    : _endswith(exe, "/perl")
+    : _contains(command, "Socket")
+    : _contains(command, "connect")
+    : (_contains(command, "bash") or _contains(command, "sh"))
+
+reverse_shell_php(high)
+    | "PHP reverse shell invocation"
+    : source == "auditd"
+    : success == True
+    : _endswith(exe, "/php") or _endswith(exe, "/php-fpm")
+    : _contains(command, "fsockopen") or _contains(command, "shell_exec") or _contains(command, "system(")
+
+reverse_shell_socat(high)
+    | "socat reverse shell pattern"
+    : source == "auditd"
+    : success == True
+    : _endswith(exe, "/socat")
+    : _contains(command, " EXEC:") and (_contains(command, "bash") or _contains(command, "sh"))
+
+non_root_high_etc_mod(high)
+    | "Non-root modification of core auth files in /etc"
+    : source == "auditd"
+    : category == "file"
+    : success == True
+    : uid != 0
+    : (filepath == "/etc/passwd" or filepath == "/etc/shadow" or filepath == "/etc/sudoers")
+
+ssh_authorized_keys_change(high)
+    | "Modification of SSH authorized_keys (persistence)"
+    : source == "auditd"
+    : category == "file"
+    : success == True
+    : _endswith(filepath, "/authorized_keys")
+
+ssh_known_hosts_change(medium)
+    | "Modification of SSH known_hosts"
+    : source == "auditd"
+    : category == "file"
+    : success == True
+    : _endswith(filepath, "/.ssh/known_hosts")
+
+ssh_private_key_access(medium)
+    | "Access to SSH private key files"
+    : source == "auditd"
+    : success == True
+    : (_endswith(filepath, "/.ssh/id_rsa") or _endswith(filepath, "/.ssh/id_dsa") or _endswith(filepath, "/.ssh/id_ecdsa") or _endswith(filepath, "/.ssh/id_ed25519"))
+
+history_file_deletion(medium)
+    | "Deletion or truncation of shell history files"
+    : source == "auditd"
+    : category == "file"
+    : success == True
+    : (_endswith(filepath, "/.bash_history") or _endswith(filepath, "/.zsh_history") or _endswith(filepath, "/.sh_history"))
+
+exec_from_tmp_dir(medium)
+    | "Execution of binaries or scripts from /tmp"
+    : source == "auditd"
+    : category == "process"
+    : success == True
+    : (_startswith(exe, "/tmp/") or _contains(command, "/tmp/"))
+
+exec_from_dev_shm_or_var_tmp(medium)
+    | "Execution from /dev/shm or /var/tmp"
+    : source == "auditd"
+    : category == "process"
+    : success == True
+    : (_startswith(exe, "/dev/shm/") or _startswith(exe, "/var/tmp/") or _contains(command, "/dev/shm/") or _contains(command, "/var/tmp/"))
+
+tmp_script_execution(medium)
+    | "Execution of script-like files from /tmp"
+    : source == "auditd"
+    : category == "process"
+    : success == True
+    : _startswith(exe, "/tmp/")
+    : (_endswith(exe, ".sh") or _endswith(exe, ".py") or _endswith(exe, ".pl") or _endswith(exe, ".php"))
+
+sudo_spawns_shell(medium)
+    | "sudo used to spawn an interactive shell"
+    : source == "auditd"
+    : success == True
+    : (_endswith(exe, "/sudo") or _startswith(command, "sudo "))
+    : (_contains(command, "bash") or _contains(command, "sh"))
+    : tty is not None
+
+sudo_without_tty(medium)
+    | "sudo used without a TTY (potential non-interactive escalation)"
+    : source == "auditd"
+    : success == True
+    : (_endswith(exe, "/sudo") or _startswith(command, "sudo "))
+    : tty is None
+
+su_to_root(medium)
+    | "su invocation targeting root account"
+    : source == "auditd"
+    : success == True
+    : (_endswith(exe, "/su") or _startswith(command, "su"))
+    : (_contains(command, " root") or command == "su")
+
+cron_system_file_change(medium)
+    | "Modification of system cron files"
+    : source == "auditd"
+    : category == "file"
+    : success == True
+    : (_startswith(filepath, "/etc/cron.") or filepath == "/etc/crontab")
+
+rc_local_modification(medium)
+    | "Modification of rc.local boot script"
+    : source == "auditd"
+    : category == "file"
+    : success == True
+    : filepath == "/etc/rc.local"
+
+profile_rc_persistence(medium)
+    | "Modification of shell profile/rc files (~/.bashrc, ~/.profile, etc.)"
+    : source == "auditd"
+    : category == "file"
+    : success == True
+    : (_endswith(filepath, "/.bashrc") or _endswith(filepath, "/.bash_profile") or _endswith(filepath, "/.profile") or _endswith(filepath, "/.zshrc"))
+
+ssh_config_modification(medium)
+    | "Modification of SSH daemon or client configuration"
+    : source == "auditd"
+    : category == "file"
+    : success == True
+    : (filepath == "/etc/ssh/sshd_config" or filepath == "/etc/ssh/ssh_config")
+
+hosts_file_modification(medium)
+    | "Modification of /etc/hosts"
+    : source == "auditd"
+    : category == "file"
+    : success == True
+    : filepath == "/etc/hosts"
+
+sudoers_file_modification(high)
+    | "Modification of /etc/sudoers"
+    : source == "auditd"
+    : category == "file"
+    : success == True
+    : filepath == "/etc/sudoers"
+
+sudoers_d_modification(high)
+    | "Modification of sudoers.d include files"
+    : source == "auditd"
+    : category == "file"
+    : success == True
+    : _startswith(filepath, "/etc/sudoers.d/")
+
+systemd_service_file_change(high)
+    | "Modification of systemd unit files under /etc/systemd/system"
+    : source == "auditd"
+    : category == "file"
+    : success == True
+    : _startswith(filepath, "/etc/systemd/system/")
+
+audit_config_change(high)
+    | "Modification of auditd configuration under /etc/audit"
+    : source == "auditd"
+    : category == "file"
+    : success == True
+    : _startswith(filepath, "/etc/audit/")
+
+selinux_config_change(high)
+    | "SELinux configuration file modified"
+    : source == "auditd"
+    : category == "file"
+    : success == True
+    : filepath == "/etc/selinux/config"
+
+ld_preload_modification(high)
+    | "Modification of /etc/ld.so.preload (library injection persistence)"
+    : source == "auditd"
+    : category == "file"
+    : success == True
+    : filepath == "/etc/ld.so.preload"
+
+log_tamper_var_log(high)
+    | "Potential log tampering under /var/log using rm/shred/truncate"
+    : source == "auditd"
+    : category == "file"
+    : success == True
+    : _startswith(filepath, "/var/log/")
+    : (_endswith(exe, "/rm") or _endswith(exe, "/shred") or _endswith(exe, "/truncate"))
+
+history_clear_command(medium)
+    | "Explicit clearing of shell history via history -c"
+    : source == "auditd"
+    : success == True
+    : _contains(command, "history -c")
+
+journalctl_vacuum(medium)
+    | "journalctl vacuum operation (log retention change)"
+    : source == "auditd"
+    : success == True
+    : _endswith(exe, "/journalctl")
+    : (_contains(command, "--vacuum") or _contains(command, "--vacuum-size") or _contains(command, "--vacuum-time"))
+
+docker_socket_access(medium)
+    | "Access to Docker UNIX socket /var/run/docker.sock"
+    : source == "auditd"
+    : success == True
+    : filepath == "/var/run/docker.sock"
+
+docker_exec_into_container(medium)
+    | "docker exec into a container (interactive access)"
+    : source == "auditd"
+    : success == True
+    : _endswith(exe, "/docker")
+    : _contains(command, " exec ")
+    : (_contains(command, " /bin/bash") or _contains(command, " /bin/sh"))
+
+gcc_or_compiler_usage(low)
+    | "Compiler usage (gcc/g++/clang) on server"
+    : source == "auditd"
+    : success == True
+    : (_endswith(exe, "/gcc") or _endswith(exe, "/g++") or _endswith(exe, "/clang") or _endswith(exe, "/cc"))
+
+nmap_scan_usage(medium)
+    | "Nmap network scanning detected"
+    : source == "auditd"
+    : success == True
+    : (_endswith(exe, "/nmap") or _startswith(command, "nmap "))
+
+masscan_usage(medium)
+    | "masscan network scanning detected"
+    : source == "auditd"
+    : success == True
+    : (_endswith(exe, "/masscan") or _startswith(command, "masscan "))
+
+tcpdump_usage(medium)
+    | "tcpdump packet capture detected"
+    : source == "auditd"
+    : success == True
+    : (_endswith(exe, "/tcpdump") or _startswith(command, "tcpdump "))
+
+tshark_usage(medium)
+    | "tshark packet capture detected"
+    : source == "auditd"
+    : success == True
+    : (_endswith(exe, "/tshark") or _startswith(command, "tshark "))
+
+ip_forwarding_enabled(medium)
+    | "sysctl enabling IPv4 forwarding"
+    : source == "auditd"
+    : success == True
+    : _endswith(exe, "/sysctl")
+    : _contains(command, "net.ipv4.ip_forward")
+    : _contains(command, "=1")
+
+firewall_rule_change(medium)
+    | "Firewall rule change via iptables/ip6tables/nft"
+    : source == "auditd"
+    : success == True
+    : (_endswith(exe, "/iptables") or _endswith(exe, "/ip6tables") or _endswith(exe, "/nft"))
+
+mount_operation(medium)
+    | "Mount or unmount filesystem"
+    : source == "auditd"
+    : success == True
+    : (_endswith(exe, "/mount") or _endswith(exe, "/umount"))
+
+kernel_module_insert(high)
+    | "Kernel module insertion (insmod/modprobe)"
+    : source == "auditd"
+    : success == True
+    : (_endswith(exe, "/insmod") or _endswith(exe, "/modprobe"))
+
+passwd_invocation_nonroot(medium)
+    | "Non-root user invoking passwd binary"
+    : source == "auditd"
+    : success == True
+    : _endswith(exe, "/passwd")
+    : uid != 0
+
+user_management_tools(medium)
+    | "User/group management tools (useradd/usermod/groupadd/groupmod)"
+    : source == "auditd"
+    : success == True
+    : (_endswith(exe, "/useradd") or _endswith(exe, "/usermod") or _endswith(exe, "/groupadd") or _endswith(exe, "/groupmod"))
+
+shadow_file_access_nonroot(high)
+    | "Non-root process accessing /etc/shadow"
+    : source == "auditd"
+    : success == True
+    : uid != 0
+    : filepath == "/etc/shadow"
+
+chattr_immutable_change(high)
+    | "chattr modifying immutable file attributes"
+    : source == "auditd"
+    : success == True
+    : _endswith(exe, "/chattr")
+    : (_contains(command, " +i ") or _contains(command, " -i "))
+
+unusual_shell_in_tmp(high)
+    | "Shell executed from /tmp directory"
+    : source == "auditd"
+    : success == True
+    : (_endswith(exe, "/bash") or _endswith(exe, "/sh") or _endswith(exe, "/zsh"))
+    : _startswith(cwd, "/tmp")
+
+suspicious_ttyless_shell(medium)
+    | "Shell execution without TTY (potential automated or remote script)"
+    : source == "auditd"
+    : success == True
+    : (_endswith(exe, "/bash") or _endswith(exe, "/sh") or _endswith(exe, "/zsh"))
+    : tty is None
+
+root_shell_interactive(high)
+    | "Interactive root shell spawned"
+    : source == "auditd"
+    : success == True
+    : uid == 0
+    : (_endswith(exe, "/bash") or _endswith(exe, "/sh") or _endswith(exe, "/zsh"))
+    : tty is not None
+
+high_uid_process_start(low)
+    | "Process started as privileged user (uid < 1000)"
+    : source == "auditd"
+    : command_line != "(systemd)"
+    : success == True
+    : uid >= 0 and uid < 1000
+
+ssh_root_login_failure(medium)
+    | "Failed SSH login attempt for root user"
+    : source == "journald"
+    : process_name == "sshd"
+    : _contains(message, "Failed password")
+    : _contains(message, "for root")
+
+ssh_auth_failure(low)
+    | "SSH authentication failure for any user"
+    : source == "journald"
+    : process_name == "sshd"
+    : _contains(message, "Failed password")
+
+ssh_login_success(medium)
+    | "Successful SSH login"
+    : source == "journald"
+    : process_name == "sshd"
+    : _contains(message, "Accepted password") or _contains(message, "Accepted publickey")
+
+sshd_config_error(high)
+    | "sshd configuration error on reload"
+    : source == "journald"
+    : process_name == "sshd"
+    : priority <= 3
+    : (_contains(message, "error") or _contains(message, "fatal") or _contains(message, "Bad configuration"))
+
+kernel_oom_kill(high)
+    | "Kernel out-of-memory killer invoked"
+    : source == "journald"
+    : process_name == "kernel"
+    : _contains(message, "Out of memory")
+    : _contains(message, "Killed process")
+
+core_service_failed_state(high)
+    | "Core service entered failed state (sshd/nginx/docker)"
+    : source == "journald"
+    : (unit == "sshd.service" or unit == "nginx.service" or unit == "docker.service")
+    : priority <= 3
+    : (_contains(message, "entered failed state") or _contains(message, "Failed with result"))
+
+sudo_auth_failure(medium)
+    | "Failed sudo authentication"
+    : source == "journald"
+    : process_name == "sudo"
+    : (_contains(message, "authentication failure") or _contains(message, "incorrect password"))
+
+cron_daemon_error(medium)
+    | "Cron daemon error"
+    : source == "journald"
+    : (process_name == "cron" or process_name == "crond")
+    : priority <= 3
+    : _contains(message, "error")
+
+filesystem_errors(high)
+    | "Filesystem errors in kernel messages"
+    : source == "journald"
+    : process_name == "kernel"
+    : (_contains(message, "EXT4-fs error") or (_contains(message, "XFS") and _contains(message, "error")))
+
+seccomp_or_apparmor_violation(high)
+    | "Seccomp/AppArmor security policy violation"
+    : source == "journald"
+    : (_contains(message, "seccomp") or _contains(message, "apparmor"))
+    : _contains(message, "denied")
+
+selinux_denial(high)
+    | "SELinux denial logged"
+    : source == "journald"
+    : _contains(message, "SELinux is preventing") or _contains(message, "avc:  denied")
+
+nginx_5xx_error(low)
+    | "nginx logged a 5xx HTTP error"
+    : source == "journald"
+    : unit == "nginx.service"
+    : _contains(message, " 5") and _contains(message, "HTTP")
+
+docker_daemon_error(medium)
+    | "Docker daemon error"
+    : source == "journald"
+    : (unit == "docker.service" or process_name == "dockerd")
+    : priority <= 3
+
+systemd_service_restart_loop(medium)
+    | "systemd service in restart loop"
+    : source == "journald"
+    : _contains(message, "Start request repeated too quickly") or _contains(message, "Restarting too fast")
+
+high_priority_kernel_message(high)
+    | "High-priority kernel warning or error"
+    : source == "journald"
+    : process_name == "kernel"
+    : priority <= 3
+
+journal_corruption_warning(high)
+    | "Systemd-journald reports journal file corruption"
+    : source == "journald"
+    : process_name == "systemd-journald"
+    : _contains(message, "File corruption detected") or _contains(message, "INVALID journal file")
+
+suspicious_netcat_like_tool(medium)
+    | "Netcat-like tool used (nc, ncat, socat)"
+    : source == "auditd"
+    : success == True
+    : (_endswith(exe, "/nc") or _endswith(exe, "/ncat") or _endswith(exe, "/socat"))
+
+python_execution_from_tmp(medium)
+    | "Python executed from /tmp directory"
+    : source == "auditd"
+    : success == True
+    : _endswith(exe, "/python") or _endswith(exe, "/python3")
+    : _startswith(cwd, "/tmp")
+
+webshell_like_command(high)
+    | "Command contains typical webshell patterns"
+    : source == "auditd"
+    : success == True
+    : (_contains(command, "bash -c") or _contains(command, "sh -c"))
+    : (_contains(command, "wget ") or _contains(command, "curl "))
+    : _contains(command, "http")
+
+unexpected_package_manager_use(medium)
+    | "Use of package manager (apt/yum/dnf) which may indicate system changes"
+    : source == "auditd"
+    : success == True
+    : (_endswith(exe, "/apt") or _endswith(exe, "/apt-get") or _endswith(exe, "/yum") or _endswith(exe, "/dnf") or _endswith(exe, "/zypper"))
+
+suid_binary_execution(medium)
+    | "Execution of known SUID binaries (potential privesc)"
+    : source == "auditd"
+    : success == True
+    : (_endswith(exe, "/sudo") or _endswith(exe, "/su") or _endswith(exe, "/mount") or _endswith(exe, "/umount"))
+
+passwd_file_read(medium)
+    | "Reading /etc/passwd file"
+    : source == "auditd"
+    : success == True
+    : filepath == "/etc/passwd"
+
+etc_group_modification(medium)
+    | "Modification of /etc/group"
+    : source == "auditd"
+    : category == "file"
+    : success == True
+    : filepath == "/etc/group"
+
+tmp_archive_creation(medium)
+    | "Creation of tar/zip archives under /tmp (possible staging for exfil)"
+    : source == "auditd"
+    : category == "file"
+    : success == True
+    : _startswith(filepath, "/tmp/")
+    : (_endswith(filepath, ".tar") or _endswith(filepath, ".tar.gz") or _endswith(filepath, ".tgz") or _endswith(filepath, ".zip"))
+
+suspicious_curl_to_external(medium)
+    | "curl used to fetch from remote HTTP(S)"
+    : source == "auditd"
+    : success == True
+    : _endswith(exe, "/curl")
+    : (_contains(command, "http://") or _contains(command, "https://"))
+
+suspicious_wget_to_external(medium)
+    | "wget used to fetch from remote HTTP(S)"
+    : source == "auditd"
+    : success == True
+    : _endswith(exe, "/wget")
+    : (_contains(command, "http://") or _contains(command, "https://"))
+
+rsync_over_ssh(medium)
+    | "rsync used over SSH"
+    : source == "auditd"
+    : success == True
+    : _endswith(exe, "/rsync")
+    : _contains(command, "ssh")
+
+suspicious_chmod_777(medium)
+    | "chmod 777 used (world-writable & executable)"
+    : source == "auditd"
+    : success == True
+    : _endswith(exe, "/chmod")
+    : _contains(command, " 777 ")
+
+suspicious_chown_root(medium)
+    | "chown used to change owner to root"
+    : source == "auditd"
+    : success == True
+    : _endswith(exe, "/chown")
+    : _contains(command, " root:")
+
+mount_over_etc_or_rootfs(high)
+    | "Mount operation targeting /etc or root filesystem"
+    : source == "auditd"
+    : success == True
+    : _endswith(exe, "/mount")
+    : (_contains(command, " /etc ") or _contains(command, " / "))
+
+tmp_systemd_unit_creation(high)
+    | "systemd unit file created under /etc/systemd/system from /tmp (persistence)"
+    : source == "auditd"
+    : category == "file"
+    : success == True
+    : _startswith(filepath, "/etc/systemd/system/")
+    : _contains(cwd, "/tmp")
+
+system_time_change(high)
+    | "System time changed via date/timedatectl"
+    : source == "auditd"
+    : success == True
+    : (_endswith(exe, "/date") or _endswith(exe, "/timedatectl"))
+    : _contains(command, "set") or _contains(command, "--adjust-system-clock")
+
+password_file_backup_creation(medium)
+    | "Backup copy of passwd/shadow created (suspicious)"
+    : source == "auditd"
+    : category == "file"
+    : success == True
+    : (_contains(filepath, "/etc/passwd-") or _contains(filepath, "/etc/shadow-") or _contains(filepath, "/etc/passwd.bak") or _contains(filepath, "/etc/shadow.bak"))
+
+curl_pipe_sh(high)
+    | "curl output piped directly to shell"
+    : source == "auditd"
+    : success == True
+    : _endswith(exe, "/curl")
+    : (_contains(command, "| bash") or _contains(command, "| sh"))
+
+wget_pipe_sh(high)
+    | "wget output piped directly to shell"
+    : source == "auditd"
+    : success == True
+    : _endswith(exe, "/wget")
+    : (_contains(command, "| bash") or _contains(command, "| sh"))
+
+python_download_and_exec(high)
+    | "Python used to download and execute from HTTP"
+    : source == "auditd"
+    : success == True
+    : (_endswith(exe, "/python") or _endswith(exe, "/python3"))
+    : (_contains(command, "http://") or _contains(command, "https://"))
+    : (_contains(command, "exec(") or _contains(command, "eval("))
+
+perl_download_and_exec(high)
+    | "Perl used to download and execute from HTTP"
+    : source == "auditd"
+    : success == True
+    : _endswith(exe, "/perl")
+    : (_contains(command, "LWP::UserAgent") or _contains(command, "curl"))
+    : (_contains(command, "system(") or _contains(command, "exec("))
+
+unexpected_interpreter_in_etc(high)
+    | "Interpreter executed with cwd in /etc (suspicious)"
+    : source == "auditd"
+    : success == True
+    : (_endswith(exe, "/python") or _endswith(exe, "/bash") or _endswith(exe, "/sh"))
+    : _startswith(cwd, "/etc")
+
+netcat_listen_on_high_port(medium)
+    | "Netcat listening on high port"
+    : source == "auditd"
+    : success == True
+    : (_endswith(exe, "/nc") or _endswith(exe, "/ncat") or _endswith(exe, "/netcat"))
+    : (_contains(command, " -l ") or _contains(command, " --listen "))
+    : _contains(command, " 0.0.0.0") or _contains(command, " 0 ")
+
+smbclient_usage(medium)
+    | "smbclient usage (potential lateral movement or data access)"
+    : source == "auditd"
+    : success == True
+    : _endswith(exe, "/smbclient")
+
+scp_usage(medium)
+    | "scp usage (file transfer over SSH)"
+    : source == "auditd"
+    : success == True
+    : _endswith(exe, "/scp")
+
+rsyslog_config_change(medium)
+    | "Modification of rsyslog configuration under /etc/rsyslog.d"
+    : source == "auditd"
+    : category == "file"
+    : success == True
+    : _startswith(filepath, "/etc/rsyslog.d/")
+
+pam_config_change(high)
+    | "PAM configuration file modified"
+    : source == "auditd"
+    : category == "file"
+    : success == True
+    : _startswith(filepath, "/etc/pam.d/")
+
+passwd_file_copy_to_tmp(high)
+    | "Copy of passwd or shadow to /tmp"
+    : source == "auditd"
+    : category == "file"
+    : success == True
+    : (_startswith(filepath, "/tmp/") and (_contains(filepath, "passwd") or _contains(filepath, "shadow")))
+
+new_user_home_creation(medium)
+    | "Creation of new home directory under /home"
+    : source == "auditd"
+    : category == "file"
+    : success == True
+    : _startswith(filepath, "/home/")
+    : _contains(filepath, "/.bashrc") or _contains(filepath, "/.profile")
+
+unexpected_sshd_on_nonstandard_port(medium)
+    | "sshd started on non-standard port (not 22) from journald logs"
+    : source == "journald"
+    : process_name == "sshd"
+    : _contains(message, "Server listening on")
+    : not _contains(message, " port 22 ")
+
+multiple_auth_failures_single_event(low)
+    | "Log line indicates multiple authentication failures in one message"
+    : source == "journald"
+    : (_contains(message, "authentication failure") or _contains(message, "Failed password"))
+    : (_contains(message, "from") and _contains(message, "port"))
+
+kernel_hardware_error(high)
+    | "Kernel hardware error (MCE, machine check)"
+    : source == "journald"
+    : process_name == "kernel"
+    : (_contains(message, "Machine check events") or _contains(message, "mce: [Hardware Error]"))
+
+filesystem_readonly_remount(high)
+    | "Filesystem remounted read-only (serious disk or FS issue)"
+    : source == "journald"
+    : process_name == "kernel"
+    : _contains(message, "Remounting filesystem read-only")
+
+swap_exhausted_warning(medium)
+    | "Swap space exhausted warning"
+    : source == "journald"
+    : process_name == "kernel"
+    : _contains(message, "swap space") and _contains(message, "exhausted")
+
+unusual_shell_in_etc(high)
+    | "Shell executed with current directory in /etc"
+    : source == "auditd"
+    : success == True
+    : (_endswith(exe, "/bash") or _endswith(exe, "/sh"))
+    : _startswith(cwd, "/etc")
+
+tmp_ssh_binary_execution(high)
+    | "Binary named ssh executed from /tmp"
+    : source == "auditd"
+    : success == True
+    : _endswith(exe, "/ssh")
+    : _startswith(cwd, "/tmp")
+
+vim_editing_sudoers(high)
+    | "vim used to edit sudoers file"
+    : source == "auditd"
+    : success == True
+    : (_endswith(exe, "/vim") or _endswith(exe, "/vi"))
+    : (filepath == "/etc/sudoers" or _startswith(filepath, "/etc/sudoers.d/"))
+
+nc_bind_shell_on_low_port(high)
+    | "Netcat bind shell on low port (<1024)"
+    : source == "auditd"
+    : success == True
+    : (_endswith(exe, "/nc") or _endswith(exe, "/ncat") or _endswith(exe, "/netcat"))
+    : (_contains(command, " -l ") or _contains(command, " --listen "))
+    : (_contains(command, " 22 ") or _contains(command, " 23 ") or _contains(command, " 80 ") or _contains(command, " 443 "))
+
+unexpected_root_cron_edit(high)
+    | "Direct editing of root's crontab"
+    : source == "auditd"
+    : success == True
+    : (_endswith(exe, "/crontab") or _startswith(command, "crontab "))
+    : uid == 0
