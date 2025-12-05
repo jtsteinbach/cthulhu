@@ -668,7 +668,7 @@ kernel_hardware_error(high)
     | "Kernel hardware error (MCE, machine check)"
     : source == "journald"
     : process_name == "kernel"
-    : (message contains "Machine check events" or message contains "mce: [Hardware Error]"))
+    : (message contains "Machine check events" or message contains "mce: [Hardware Error]")
 
 filesystem_readonly_remount(high)
     | "Filesystem remounted read-only (serious disk or FS issue)"
