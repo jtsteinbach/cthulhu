@@ -22,7 +22,7 @@ RULES_PATH = "/cthulhu/alert.rules"
 
 # Colors
 RED = "\033[38;2;255;46;46m"
-GREEN = "\033[38;2;0;255;140m"
+GREEN = "\033[38;2;2;237;112m"
 AQUA = "\033[38;2;0;255;183m"
 YELLOW  = "\033[38;2;255;238;0m"
 GRAY  = "\033[38;2;122;122;122m"
@@ -160,7 +160,7 @@ def tail_alerts_live(
                 print(f"""
     {GREEN}┌──────────────────────────────┐
     {GREEN}│                              │
-    {GREEN}│           {AQUA}^(;,;)^ {D_GRAY}v1.0       {GREEN}│
+    {GREEN}│           {AQUA}^(;,;)^ {D_GRAY}v1.1       {GREEN}│
     {GREEN}│         {AQUA}CTHULHU SIEM         {GREEN}│
     {GREEN}│                              │
     {GREEN}│    {GRAY}https://jts.gg/cthulhu    {GREEN}│
@@ -238,7 +238,7 @@ def triage_alert_by_uid(path: str) -> None:
     print(f"""
     {GREEN}┌──────────────────────────────┐
     {GREEN}│                              │
-    {GREEN}│           {AQUA}^(;,;)^ {D_GRAY}v1.0       {GREEN}│
+    {GREEN}│           {AQUA}^(;,;)^ {D_GRAY}v1.1       {GREEN}│
     {GREEN}│         {AQUA}CTHULHU SIEM         {GREEN}│
     {GREEN}│                              │
     {GREEN}│    {GRAY}https://jts.gg/cthulhu    {GREEN}│
@@ -333,7 +333,7 @@ def view_loaded_rules() -> None:
     print(f"""
     {GREEN}┌──────────────────────────────┐
     {GREEN}│                              │
-    {GREEN}│           {AQUA}^(;,;)^ {D_GRAY}v1.0       {GREEN}│
+    {GREEN}│           {AQUA}^(;,;)^ {D_GRAY}v1.1       {GREEN}│
     {GREEN}│         {AQUA}CTHULHU SIEM         {GREEN}│
     {GREEN}│                              │
     {GREEN}│    {GRAY}https://jts.gg/cthulhu    {GREEN}│
@@ -375,7 +375,7 @@ def view_search_all_alerts(path: str) -> None:
     print(f"""
     {GREEN}┌──────────────────────────────┐
     {GREEN}│                              │
-    {GREEN}│           {AQUA}^(;,;)^ {D_GRAY}v1.0       {GREEN}│
+    {GREEN}│           {AQUA}^(;,;)^ {D_GRAY}v1.1       {GREEN}│
     {GREEN}│         {AQUA}CTHULHU SIEM         {GREEN}│
     {GREEN}│                              │
     {GREEN}│    {GRAY}https://jts.gg/cthulhu    {GREEN}│
@@ -421,7 +421,7 @@ def view_alert_stats(path: str) -> None:
     print(f"""
     {GREEN}┌──────────────────────────────┐
     {GREEN}│                              │
-    {GREEN}│           {AQUA}^(;,;)^ {D_GRAY}v1.0       {GREEN}│
+    {GREEN}│           {AQUA}^(;,;)^ {D_GRAY}v1.1       {GREEN}│
     {GREEN}│         {AQUA}CTHULHU SIEM         {GREEN}│
     {GREEN}│                              │
     {GREEN}│    {GRAY}https://jts.gg/cthulhu    {GREEN}│
@@ -471,21 +471,23 @@ def main_menu() -> None:
         print(f"""
     {GREEN}┌──────────────────────────────┐
     {GREEN}│                              │
-    {GREEN}│           {AQUA}^(;,;)^ {D_GRAY}v1.0       {GREEN}│
+    {GREEN}│           {AQUA}^(;,;)^ {D_GRAY}v1.1       {GREEN}│
     {GREEN}│         {AQUA}CTHULHU SIEM         {GREEN}│
-    {GREEN}│                              │
+    {GREEN}│                              │  
+    {GREEN}│       {AQUA}Built for Debian       {GREEN}│
+    {GREEN}│   {GRAY}https://r2.jts.gg/license  {GREEN}│
     {GREEN}│    {GRAY}https://jts.gg/cthulhu    {GREEN}│
     {GREEN}│                              │
     {GREEN}└──────────────────────────────┘
 
-    {YELLOW}1. {AQUA}LIVE ALERT FEED
-    {YELLOW}2. {GRAY}FILTERED LIVE ALERT FEED
-    {YELLOW}3. {GRAY}ALERT TRIAGE
-    {YELLOW}4. {GRAY}VIEW/SEARCH ALL ALERTS
-    {YELLOW}5. {GRAY}EXPORT ALERT
-    {YELLOW}6. {GRAY}ALERT STATS
-    {YELLOW}7. {GRAY}LOADED RULES
-    {YELLOW}q. {GRAY}QUIT
+    {AQUA}1. {YELLOW}LIVE ALERT FEED
+    {AQUA}2. {GRAY}FILTERED LIVE ALERT FEED
+    {AQUA}3. {GRAY}ALERT TRIAGE
+    {AQUA}4. {GRAY}VIEW/SEARCH ALL ALERTS
+    {AQUA}5. {GRAY}EXPORT ALERT
+    {AQUA}6. {GRAY}ALERT STATS
+    {AQUA}7. {GRAY}LOADED RULES
+    {AQUA}q. {GRAY}QUIT
     """)
         choice = input(f"{GREEN}    Select Action > ").strip().lower()
 
