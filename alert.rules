@@ -717,3 +717,162 @@ unexpected_root_cron_edit(high)
     : success == True
     : (_endswith(exe, "/crontab") or _startswith(command, "crontab "))
     : uid == 0
+
+ssh_root_login_success(high)
+    | "Successful SSH login as root"
+    : source == "journald"
+    : process_name == "sshd"
+    : _contains(message, "Accepted ")
+    : _contains(message, "for root")
+
+auditd_service_stopped(high)
+    | "auditd service stopped or failed"
+    : source == "journald"
+    : unit == "auditd.service"
+    : (_contains(message, "Stopped") or _contains(message, "stop-sigterm") or _contains(message, "Failed with result"))
+
+logging_service_stopped(high)
+    | "Core logging service stopped (rsyslog or systemd-journald)"
+    : source == "journald"
+    : (unit == "rsyslog.service" or unit == "systemd-journald.service")
+    : (_contains(message, "Stopped") or _contains(message, "stop-sigterm") or _contains(message, "Failed with result"))
+
+ufw_disabled(high)
+    | "UFW firewall disabled"
+    : source == "auditd"
+    : success == True
+    : _endswith(exe, "/ufw")
+    : _contains(command, " disable")
+
+ufw_default_allow_incoming(high)
+    | "UFW default policy changed to allow incoming"
+    : source == "auditd"
+    : success == True
+    : _endswith(exe, "/ufw")
+    : _contains(command, " default allow")
+
+iptables_flush(high)
+    | "iptables/ip6tables flush (all chains cleared)"
+    : source == "auditd"
+    : success == True
+    : (_endswith(exe, "/iptables") or _endswith(exe, "/ip6tables"))
+    : (_contains(command, " -F") or _contains(command, " --flush"))
+
+systemctl_stopping_core_service(high)
+    | "systemctl used to stop core service (sshd/nginx/docker/ufw)"
+    : source == "auditd"
+    : success == True
+    : _endswith(exe, "/systemctl")
+    : (_contains(command, " stop sshd") or _contains(command, " stop nginx") or _contains(command, " stop docker") or _contains(command, " stop ufw"))
+
+user_created_with_interactive_shell(medium)
+    | "New user created with an interactive shell"
+    : source == "auditd"
+    : success == True
+    : (_endswith(exe, "/useradd") or _endswith(exe, "/adduser"))
+    : (_contains(command, " -s /bin/bash") or _contains(command, " -s /bin/sh") or _contains(command, " -s /bin/zsh"))
+
+user_added_to_sudo_group(high)
+    | "User added to sudo group"
+    : source == "auditd"
+    : success == True
+    : _endswith(exe, "/usermod")
+    : (_contains(command, "-aG sudo") or _contains(command, " -G sudo"))
+
+user_added_to_docker_group(medium)
+    | "User added to docker group"
+    : source == "auditd"
+    : success == True
+    : _endswith(exe, "/usermod")
+    : (_contains(command, "-aG docker") or _contains(command, " -G docker"))
+
+shell_changed_to_interactive(medium)
+    | "User shell changed to interactive shell"
+    : source == "auditd"
+    : success == True
+    : (_endswith(exe, "/chsh") or _endswith(exe, "/usermod"))
+    : (_contains(command, " -s /bin/bash") or _contains(command, " -s /bin/sh") or _contains(command, " -s /bin/zsh"))
+
+shadow_or_adm_group_membership_change(high)
+    | "User added to shadow or adm group"
+    : source == "auditd"
+    : success == True
+    : (_endswith(exe, "/usermod") or _endswith(exe, "/gpasswd") or _endswith(exe, "/groupmod"))
+    : (_contains(command, " shadow") or _contains(command, " adm"))
+
+crontab_edit(medium)
+    | "User crontab edited"
+    : source == "auditd"
+    : success == True
+    : (_endswith(exe, "/crontab") or _startswith(command, "crontab "))
+
+ssh_port_forwarding(medium)
+    | "SSH local/remote/dynamic port forwarding detected"
+    : source == "auditd"
+    : success == True
+    : _endswith(exe, "/ssh")
+    : (_contains(command, " -L ") or _contains(command, " -R ") or _contains(command, " -D "))
+
+ssh_remote_command_execution(medium)
+    | "SSH used for remote command execution (non-interactive)"
+    : source == "auditd"
+    : success == True
+    : _endswith(exe, "/ssh")
+    : (_contains(command, " -T ") or _contains(command, "BatchMode=yes") or _contains(command, " -- "))
+
+cryptominer_execution(high)
+    | "Execution of common cryptocurrency miner binary"
+    : source == "auditd"
+    : success == True
+    : (_contains(exe, "xmrig") or _contains(exe, "minerd") or _contains(exe, "ethminer") or _contains(exe, "cpuminer") or _contains(exe, "cgminer") or _contains(command, "xmrig") or _contains(command, "minerd") or _contains(command, "ethminer") or _contains(command, "cpuminer") or _contains(command, "cgminer"))
+
+cryptominer_from_tmp_or_home(high)
+    | "Cryptominer-like binary executed from /tmp or home directory"
+    : source == "auditd"
+    : success == True
+    : (_startswith(exe, "/tmp/") or _startswith(exe, "/var/tmp/") or _startswith(exe, "/dev/shm/") or _startswith(exe, "/home/"))
+    : (_contains(exe, "xmrig") or _contains(exe, "minerd") or _contains(exe, "ethminer") or _contains(exe, "cpuminer") or _contains(exe, "cgminer") or _contains(command, "xmrig") or _contains(command, "minerd") or _contains(command, "ethminer") or _contains(command, "cpuminer") or _contains(command, "cgminer"))
+
+cryptominer_download_via_curl_or_wget(medium)
+    | "curl/wget download referencing common miner names"
+    : source == "auditd"
+    : success == True
+    : (_endswith(exe, "/curl") or _endswith(exe, "/wget"))
+    : (_contains(command, "xmrig") or _contains(command, "minerd") or _contains(command, "ethminer") or _contains(command, "cpuminer") or _contains(command, "cgminer"))
+
+docker_run_privileged(high)
+    | "Docker container started with --privileged or host root filesystem mounted"
+    : source == "auditd"
+    : success == True
+    : _endswith(exe, "/docker")
+    : _contains(command, " run ")
+    : (_contains(command, "--privileged") or _contains(command, " -v /:/") or _contains(command, " --volume=/:/"))
+
+nohup_background_execution(medium)
+    | "nohup used to background a long-running process"
+    : source == "auditd"
+    : success == True
+    : _endswith(exe, "/nohup")
+    : (_contains(command, " &") or _contains(command, " </dev/null") or _contains(command, ">/dev/null"))
+
+chattr_plus_i_on_critical(high)
+    | "chattr +i used on critical system or log paths"
+    : source == "auditd"
+    : success == True
+    : _endswith(exe, "/chattr")
+    : _contains(command, " +i ")
+    : (_contains(command, "/etc/passwd") or _contains(command, "/etc/shadow") or _contains(command, "/etc/sudoers") or _contains(command, "/var/log/"))
+
+chmod_setuid_bit_on_file(high)
+    | "chmod used to set SUID bit on file"
+    : source == "auditd"
+    : success == True
+    : _endswith(exe, "/chmod")
+    : _contains(command, " u+s")
+
+setcap_on_binary(medium)
+    | "setcap used to add capabilities to a binary"
+    : source == "auditd"
+    : success == True
+    : _endswith(exe, "/setcap")
+    : _contains(command, " cap_")
