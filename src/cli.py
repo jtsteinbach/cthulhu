@@ -473,21 +473,21 @@ def main_menu() -> None:
     {GREEN}│                              │
     {GREEN}│           {AQUA}^(;,;)^ {D_GRAY}v1.1       {GREEN}│
     {GREEN}│         {AQUA}CTHULHU SIEM         {GREEN}│
-    {GREEN}│                              │  
+    {GREEN}│                              │
     {GREEN}│       {AQUA}Built for Debian       {GREEN}│
     {GREEN}│   {GRAY}https://r2.jts.gg/license  {GREEN}│
     {GREEN}│    {GRAY}https://jts.gg/cthulhu    {GREEN}│
     {GREEN}│                              │
     {GREEN}└──────────────────────────────┘
 
-    {AQUA}1. {YELLOW}LIVE ALERT FEED
-    {AQUA}2. {GRAY}FILTERED LIVE ALERT FEED
-    {AQUA}3. {GRAY}ALERT TRIAGE
-    {AQUA}4. {GRAY}VIEW/SEARCH ALL ALERTS
-    {AQUA}5. {GRAY}EXPORT ALERT
-    {AQUA}6. {GRAY}ALERT STATS
-    {AQUA}7. {GRAY}LOADED RULES
-    {AQUA}q. {GRAY}QUIT
+    {GREEN}1. {YELLOW}LIVE ALERT FEED
+    {GREEN}2. {AQUA}FILTERED LIVE ALERT FEED
+    {GREEN}3. {YELLOW}ALERT TRIAGE
+    {GREEN}4. {AQUA}VIEW/SEARCH ALL ALERTS
+    {GREEN}5. {AQUA}EXPORT ALERT
+    {GREEN}6. {AQUA}ALERT STATS
+    {GREEN}7. {AQUA}LOADED RULES
+    {GREEN}q. {GRAY}QUIT
     """)
         choice = input(f"{GREEN}    Select Action > ").strip().lower()
 
