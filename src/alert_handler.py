@@ -77,14 +77,6 @@ _JOURNALD_PRIORITY_LABELS: Dict[int, str] = {
 def _derive_auditd_enrichment(event: Dict[str, Any]) -> Dict[str, Any]:
     """
     Build enrichment fields specifically for auditd events.
-
-    Examples:
-        - command_line (full command line used)
-        - process_name (basename of exe; unified name for JRL)
-        - process_path (alias for exe)
-        - target_path / file_name / file_ext (resolved from cwd + filepath)
-        - interactive (whether a TTY was attached)
-        - process_id / parent_pid (aliases for pid / ppid)
     """
     enrichment: Dict[str, Any] = {}
 
@@ -155,14 +147,6 @@ def _derive_auditd_enrichment(event: Dict[str, Any]) -> Dict[str, Any]:
 def _derive_journald_enrichment(event: Dict[str, Any]) -> Dict[str, Any]:
     """
     Build enrichment fields specifically for journald events.
-
-    Examples:
-        - log_message (alias for message)
-        - log_unit (alias for unit)
-        - log_priority / log_priority_label
-        - is_error / is_warning / is_info (thresholds on priority)
-        - message_snippet (shortened text)
-        - service_name (unit stripped of .service)
     """
     enrichment: Dict[str, Any] = {}
 
@@ -406,20 +390,6 @@ def _build_rule_highlights(
 def build_alert(event: Dict[str, Any], match: Dict[str, Any]) -> Dict[str, Any]:
     """
     Build a saturated alert dict from an event and a rule match.
-
-    `event` is the normalized event from ingest_events.py.
-    `match` is a single match dict from rule_handler.evaluate_rules(event, rules):
-
-        {
-            "rule": "<rule_name>",
-            "severity": "<severity>",
-            "description": "<description>",
-
-            # Optional extras for rule_highlights:
-            # "expression": "<JRL condition>",
-            # "matched_fields": ["command_line", "uid"],
-            # "reason": "Short human explanation",
-        }
     """
     alert_uuid = str(_generate_uuid())
     alert_timestamp = _pst_timestamp()
@@ -456,8 +426,6 @@ def build_alert(event: Dict[str, Any], match: Dict[str, Any]) -> Dict[str, Any]:
 def persist_alert(alert: Dict[str, Any], path: str) -> None:
     """
     Append a single alert as one JSON line to the given file path.
-
-    Creates parent directories if they do not exist.
     """
     directory = os.path.dirname(path)
     if directory and not os.path.isdir(directory):
