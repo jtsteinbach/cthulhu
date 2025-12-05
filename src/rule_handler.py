@@ -69,10 +69,14 @@ def _normalize_condition_line(line: str) -> str:
         - true/false/null -> True/False/None
         - "is null" / "is not null" -> "is None" / "is not None"
         - infix string ops:
-            X contains Y     -> _contains(X, Y)
-            X startswith Y   -> _startswith(X, Y)
-            X endswith Y     -> _endswith(X, Y)
+            X contains Y      -> _contains(X, Y)
+            X !contains Y     -> not _contains(X, Y)
+            X startswith Y    -> _startswith(X, Y)
+            X !startswith Y   -> not _startswith(X, Y)
+            X endswith Y      -> _endswith(X, Y)
+            X !endswith Y     -> not _endswith(X, Y)
     """
+
     expr = line.strip()
 
     # Replace null/true/false
@@ -84,19 +88,22 @@ def _normalize_condition_line(line: str) -> str:
     expr = re.sub(r"\bis\s+not\s+null\b", "is not None", expr)
     expr = re.sub(r"\bis\s+null\b", "is None", expr)
 
-    # infix "contains", "startswith", "endswith"
-    # Very simple pattern: <identifier_or_attr> <op> <rest_of_expr>
-    # This is intentionally limited and assumes no spaces in the LHS.
-    def _infix_to_func(pattern: str, func_name: str, s: str) -> str:
-        return re.sub(
-            pattern,
-            rf"{func_name}(\1, \2)",
-            s,
-        )
+    # LHS token: allow dotted access like event.message
+    LHS = r"([A-Za-z_][A-Za-z0-9_\.]*)"
 
-    expr = _infix_to_func(r"(\S+)\s+contains\s+(.+)", "_contains", expr)
-    expr = _infix_to_func(r"(\S+)\s+startswith\s+(.+)", "_startswith", expr)
-    expr = _infix_to_func(r"(\S+)\s+endswith\s+(.+)", "_endswith", expr)
+    # NEGATED string operators
+    expr = re.sub(rf"{LHS}\s+!contains\s+(.+)", r"not _contains(\1, \2)", expr)
+    expr = re.sub(rf"{LHS}\s+!startswith\s+(.+)", r"not _startswith(\1, \2)", expr)
+    expr = re.sub(rf"{LHS}\s+!endswith\s+(.+)", r"not _endswith(\1, \2)", expr)
+
+    # Helper: convert infix op → function call
+    def _infix_to_func(pattern: str, func_name: str, s: str) -> str:
+        return re.sub(pattern, rf"{func_name}(\1, \2)", s)
+
+    # POSITIVE string operators
+    expr = _infix_to_func(rf"{LHS}\s+contains\s+(.+)", "_contains", expr)
+    expr = _infix_to_func(rf"{LHS}\s+startswith\s+(.+)", "_startswith", expr)
+    expr = _infix_to_func(rf"{LHS}\s+endswith\s+(.+)", "_endswith", expr)
 
     return expr
 
