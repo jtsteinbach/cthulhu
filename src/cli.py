@@ -481,12 +481,12 @@ def main_menu() -> None:
     {GREEN}└──────────────────────────────┘
 
     {GREEN}1. {YELLOW}LIVE ALERT FEED
-    {GREEN}2. {AQUA}FILTERED LIVE ALERT FEED
+    {GREEN}2. {GRAY}FILTERED LIVE ALERT FEED
     {GREEN}3. {YELLOW}ALERT TRIAGE
-    {GREEN}4. {AQUA}VIEW/SEARCH ALL ALERTS
-    {GREEN}5. {AQUA}EXPORT ALERT
-    {GREEN}6. {AQUA}ALERT STATS
-    {GREEN}7. {AQUA}LOADED RULES
+    {GREEN}4. {GRAY}VIEW/SEARCH ALL ALERTS
+    {GREEN}5. {GRAY}EXPORT ALERT
+    {GREEN}6. {GRAY}ALERT STATS
+    {GREEN}7. {GRAY}LOADED RULES
     {GREEN}q. {GRAY}QUIT
     """)
         choice = input(f"{GREEN}    Select Action > ").strip().lower()
