@@ -1,19 +1,5 @@
-"""
-ingest_events.py
-
-Sources:
-    * auditd   (typically /var/log/audit/audit.log)
-    * journald (typically via `journalctl -o json`)
-
-For auditd, we expose:
-    - Low-level "record" parsing per log line (parse_auditd_record_line / stream).
-    - High-level "event" grouping by serial number, syscall-centric
-      (build_auditd_event / build_auditd_events_from_stream).
-
-For journald, we expose:
-    - Normalized events from JSON lines (parse_journald_event / stream),
-      with all original fields preserved in `fields` and `raw`.
-"""
+#!/usr/bin/env python3
+# CTHULHU module    ingest_events.py
 
 from __future__ import annotations
 
@@ -23,19 +9,35 @@ from datetime import datetime, timezone
 from typing import Any, Dict, Iterable, List, Optional
 
 __all__ = [
-    # Auditd low-level
+    # auditd low-level
     "parse_auditd_record_line",
     "parse_auditd_record_stream",
-    # Auditd high-level
+    # auditd high-level
     "build_auditd_event",
     "build_auditd_events_from_stream",
-    # Journald
+    # journald
     "parse_journald_event",
     "parse_journald_stream",
 ]
 
 
-# Shared helpers
+# SOURCES
+
+# sources:
+#     * auditd   (typically /var/log/audit/audit.log)
+#     * journald (typically via `journalctl -o json`)
+#
+# for auditd, we expose:
+#     - low-level record parsing per log line (parse_auditd_record_line / stream).
+#     - high-level event grouping by serial number, syscall-centric
+#       (build_auditd_event / build_auditd_events_from_stream).
+#
+# for journald, we expose:
+#     - normalized events from json lines (parse_journald_event / stream),
+#       with all original fields preserved in `fields` and `raw`.
+
+
+# SHARED HELPERS
 
 _AUDITD_HEADER_RE = re.compile(
     r"""
@@ -54,34 +56,28 @@ _AUDITD_HEADER_RE = re.compile(
 
 
 def _parse_epoch_to_iso(ts_sec: int, ts_usec: int = 0) -> str:
-    """
-    Convert epoch seconds + microseconds to an ISO 8601 UTC string.
+    # convert epoch seconds plus microseconds to an iso 8601 utc string.
+    # example: "2025-12-01T18:42:10.123456+00:00"
 
-    Example: "2025-12-01T18:42:10.123456+00:00"
-    """
     dt = datetime.fromtimestamp(ts_sec + ts_usec / 1_000_000, tz=timezone.utc)
     return dt.isoformat()
 
 
 def _safe_int(value: Any) -> Optional[int]:
+    # safely convert a value to int, returning none on failure.
+
     try:
         return int(value)
     except (TypeError, ValueError):
         return None
 
 
-# AUDITD: low-level record parsing (per line, no data loss)
+# AUDITD LOW-LEVEL RECORD PARSING (PER LINE, NO DATA LOSS)
 
 def _tokenize_auditd_kv(s: str) -> Iterable[str]:
-    """
-    Tokenize a string of auditd key=value pairs.
+    # tokenize a string of auditd key=value pairs, handling quoted values.
+    # example: key1=val1 key2="value with spaces" key3=val3
 
-    Handles quoted values:
-        key1=val1 key2="value with spaces" key3=val3
-
-    Returns tokens such as:
-        ["key1=val1", "key2=\"value with spaces\"", "key3=val3"]
-    """
     tokens: List[str] = []
     current: List[str] = []
     in_quotes = False
@@ -117,9 +113,8 @@ def _tokenize_auditd_kv(s: str) -> Iterable[str]:
 
 
 def _strip_auditd_value(v: str) -> str:
-    """
-    Strip surrounding quotes and unescape simple \" sequences.
-    """
+    # strip surrounding quotes and unescape simple \" sequences.
+
     if len(v) >= 2 and v[0] == '"' and v[-1] == '"':
         v = v[1:-1]
     v = v.replace('\\"', '"')
@@ -127,27 +122,9 @@ def _strip_auditd_value(v: str) -> str:
 
 
 def parse_auditd_record_line(line: str) -> Optional[Dict[str, Any]]:
-    """
-    Parse a single auditd record line into a structured dict.
-    Returns None if the line doesn't match the expected header.
+    # parse a single auditd record line into a structured dict.
+    # returns none if the line does not match the expected header.
 
-    Example return:
-        {
-            "source": "auditd",
-            "raw": "<original line>",
-            "type": "SYSCALL",
-            "timestamp": "...",
-            "epoch": 1701455952.123,
-            "serial": 420,
-            "fields": {
-                "arch": "c000003e",
-                "syscall": "59",
-                "success": "yes",
-                "pid": "1234",
-                ...
-            }
-        }
-    """
     line = line.rstrip("\n")
 
     m = _AUDITD_HEADER_RE.match(line)
@@ -186,10 +163,9 @@ def parse_auditd_record_line(line: str) -> Optional[Dict[str, Any]]:
 
 
 def parse_auditd_record_stream(lines: Iterable[str]) -> Iterable[Dict[str, Any]]:
-    """
-    Generator: parse a stream of auditd lines into individual records.
-    Each yielded dict corresponds to exactly one matching audit.log line.
-    """
+    # generator: parse a stream of auditd lines into individual records.
+    # each yielded dict corresponds to exactly one matching audit.log line.
+
     for line in lines:
         line = line.strip()
         if not line:
@@ -199,44 +175,13 @@ def parse_auditd_record_stream(lines: Iterable[str]) -> Iterable[Dict[str, Any]]
             yield rec
 
 
-# AUDITD: high-level event assembly (multi-record, syscall-centric)
+# AUDITD HIGH-LEVEL EVENT ASSEMBLY (MULTI-RECORD, SYSCALL-CENTRIC)
 
 def build_auditd_event(records: List[Dict[str, Any]]) -> Dict[str, Any]:
-    """
-    Build a high-level auditd event from all records sharing the same serial.
-    This layer:
-        - Exposes syscall-centric fields (uid, pid, exe, command, success, etc.).
-        - Gathers cwd and file paths from CWD/PATH records.
-        - Concatenates raw lines into a single 'raw' field.
-        - Preserves ALL record data in 'records'.
+    # build a high-level auditd event from all records sharing the same serial.
+    # exposes syscall-centric fields, gathers cwd and file paths, concatenates raw lines,
+    # and preserves all record data in the records list.
 
-    Returned schema (top-level keys):
-
-        "source"      : "auditd"
-        "timestamp"   : str (ISO)
-        "epoch"       : float
-        "event_id"    : int (same as serial)
-        "serial"      : int
-        "syscall"     : str | None
-        "success"     : bool
-        "exe"         : str | None
-        "command"     : str | None
-        "cwd"         : str | None
-        "tty"         : str | None
-        "uid"         : int | None
-        "euid"        : int | None
-        "auid"        : int | None
-        "gid"         : int | None
-        "pid"         : int | None
-        "ppid"        : int | None
-        "session"     : int | None
-        "host"        : str | None   (from node/hostname if present)
-        "filepath"    : str | None   (first of filepaths)
-        "filepaths"   : List[str]
-        "raw"         : str          (all lines joined by '\\n')
-        "records"     : List[record dicts] (no data loss)
-        "category"    : str          (coarse classification)
-    """
     if not records:
         raise ValueError("build_auditd_event() called with empty records list")
 
@@ -261,7 +206,7 @@ def build_auditd_event(records: List[Dict[str, Any]]) -> Dict[str, Any]:
     def to_int_from_syscall(key: str) -> Optional[int]:
         return _safe_int(syscall_fields.get(key))
 
-    # Filepaths from PATH records
+    # filepaths from PATH records
     filepaths: List[str] = []
     for r in path_recs:
         f = r.get("fields", {})
@@ -295,7 +240,7 @@ def build_auditd_event(records: List[Dict[str, Any]]) -> Dict[str, Any]:
 
     event_id = serial
 
-    # Best-effort category
+    # best-effort category
     success_flag = syscall_fields.get("success")
     if success_flag == "no":
         category = "process_error"
@@ -333,18 +278,9 @@ def build_auditd_event(records: List[Dict[str, Any]]) -> Dict[str, Any]:
 def build_auditd_events_from_stream(
     lines: Iterable[str],
 ) -> Iterable[Dict[str, Any]]:
-    """
-    High-level generator:
-        audit.log lines -> rich auditd events.
+    # high-level generator: audit.log lines -> rich auditd events.
+    # records are grouped by serial; a new event is emitted when the serial changes.
 
-    Records are grouped by "serial" (audit(…:serial):). A new event is emitted
-    when the serial changes.
-    
-    Example:
-        with open("/var/log/audit/audit.log") as f:
-            for event in build_auditd_events_from_stream(f):
-                handle_event(event)
-    """
     current_serial: Optional[int] = None
     current_records: List[Dict[str, Any]] = []
 
@@ -366,29 +302,12 @@ def build_auditd_events_from_stream(
         yield build_auditd_event(current_records)
 
 
-# JOURNALD INGEST (keeps ALL fields)
+# JOURNALD INGEST (KEEPS ALL FIELDS)
 
 def parse_journald_event(event: Any) -> Dict[str, Any]:
-    """
-    Parse a single journald event (JSON string or dict) into a normalized dict.
-    We keep ALL original metadata in the `fields` and `raw` dicts (no data loss).
+    # parse a single journald event (json string or dict) into a normalized dict.
+    # keeps all original metadata in the fields and raw dicts (no data loss).
 
-    Returned schema:
-
-        "source"       : "journald"
-        "timestamp"    : str | None (ISO)
-        "epoch"        : float | None
-        "host"         : str | None
-        "message"      : str
-        "priority"     : int | None
-        "facility"     : int | None
-        "unit"         : str | None
-        "process_id"   : int | None
-        "process_name" : str | None
-        "category"     : str ("auth" | "kernel" | "service" | "error" | "other")
-        "fields"       : Dict[str, Any]  (full journald JSON)
-        "raw"          : Dict[str, Any]  (same as fields)
-    """
     if isinstance(event, str):
         event_raw = json.loads(event)
     else:
@@ -454,6 +373,8 @@ def _classify_journald_category(
     message: str,
     priority: Optional[int],
 ) -> str:
+    # classify a journald event into a coarse category based on unit, process, message, and priority.
+
     unit_l = (unit or "").lower()
     pname = (process_name or "").lower()
     msg = (message or "").lower()
@@ -476,10 +397,9 @@ def _classify_journald_category(
 
 
 def parse_journald_stream(lines: Iterable[str]) -> Iterable[Dict[str, Any]]:
-    """
-    Generator: parse a stream of journald JSON lines into normalized events.
-    Typical producer: `journalctl -o json -f`
-    """
+    # generator: parse a stream of journald json lines into normalized events.
+    # typical producer: `journalctl -o json -f`
+
     for line in lines:
         line = line.strip()
         if not line:
