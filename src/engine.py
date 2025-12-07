@@ -17,7 +17,7 @@ from ingest_events import (
     parse_journald_stream,
 )
 from rule_handler import load_rules_from_file, evaluate_rules
-from alert_handler import handle_matches
+from alert_handler import handle_matches, _build_event_meta, _build_event_summary
 
 
 # Configuration
@@ -94,8 +94,11 @@ def process_event(
     Evaluate rules against an event, build alerts for any matches,
     persist them, and print a summary line.
     """
+    event_meta = _build_event_meta(event)
+    event_summary = _build_event_summary(event)
+    enriched_event = {**event, **event_meta, **event_summary}
     try:
-        matches = evaluate_rules(event, rules)
+        matches = evaluate_rules(enriched_event, rules)
     except Exception as e:
         # In production you may want structured logging here.
         print(f"[engine] Error evaluating rules: {e}", file=sys.stderr)
@@ -107,7 +110,7 @@ def process_event(
     # Ensure alert file operations are serialized
     try:
         with alert_lock:
-            alerts = handle_matches(event, matches, alert_log_path)
+            alerts = handle_matches(enriched_event, matches, alert_log_path)
     except Exception as e:
         print(f"[engine] Error handling matches: {e}", file=sys.stderr)
         return
