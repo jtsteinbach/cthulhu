@@ -47,10 +47,12 @@ def print_alert_line(alert: Dict[str, Any]) -> None:
     rule_name = rule.get("name") or "unknown_rule"
     description = rule.get("description") or ""
 
-    summary = alert.get("event_summary") or {}
-    msg = summary.get("message") or description
+    meta = alert.get("event_meta") or {}
+    # for journald, meta["message"] exists; for auditd it usually doesn't, so we fall back to description
+    msg = meta.get("message") or description
 
     print(f"{ts} [{uid}] [{severity}] [{rule_name}] {msg}", flush=True)
+
 
 
 def follow_file(path: str, read_existing: bool = False) -> Iterable[str]:
