@@ -10,7 +10,6 @@ Rules evaluate against **enriched events**, which include:
 - Raw auditd or journald event fields  
 - Normalized meta fields  
 - Enrichment fields (process_name, command_line, file_ext, etc.)
-- Severities: LOW, MEDIUM, HIGH
 
 Rules follow this structure:
 
@@ -22,6 +21,51 @@ name(severity)
 ```
 
 All `:` conditions must be true.
+
+---
+
+## 1.5 JRL SYNTAX GUIDE
+
+This is the minimal syntax needed to write rules.
+
+**Rule structure**
+```text
+name(severity)
+    | "Description"
+    : condition
+    : condition
+```
+
+**Comparisons**
+```text
+==  !=  <  >  <=  >=
+```
+
+**Boolean logic**
+```text
+and  or  not
+```
+
+**Null checks**
+```text
+field is null
+field is not null
+```
+
+**String operators**
+```text
+field contains "text"
+field !contains "text"
+field startswith "/path"
+field !startswith "/path"
+field endswith ".sh"
+field !endswith ".sh"
+```
+
+**Grouping**
+```text
+(field1 == 1 or field2 == 2) and success_bool == true
+```
 
 ---
 
