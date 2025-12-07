@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 # CTHULHU module    alert_handler.py
 
 from __future__ import annotations
