@@ -61,7 +61,7 @@ def follow_file(path: str, read_existing: bool = False) -> Iterable[str]:
 
     # wait until file exists
     while not os.path.exists(path):
-        print(f"[engine] Waiting for audit log file to appear: {path}")
+        print(f"[ENGINE] Waiting for audit log file to appear: {path}")
         time.sleep(2.0)
 
     with open(path, "r", encoding="utf-8", errors="replace") as f:
@@ -161,7 +161,7 @@ def process_event(
         matches = evaluate_rules(enriched_event, rules)
     except Exception as e:
         # in production you may want structured logging here.
-        print(f"[engine] Error evaluating rules: {e}", file=sys.stderr)
+        print(f"[ENGINE] Error evaluating rules: {e}", file=sys.stderr)
         return
 
     if not matches:
@@ -172,7 +172,7 @@ def process_event(
         with alert_lock:
             alerts = handle_matches(enriched_event, matches, alert_log_path)
     except Exception as e:
-        print(f"[engine] Error handling matches: {e}", file=sys.stderr)
+        print(f"[ENGINE] Error handling matches: {e}", file=sys.stderr)
         return
 
     for alert in alerts:
@@ -190,10 +190,10 @@ def auditd_ingest_loop(
     # ingest loop for auditd: tails the audit log and feeds normalized events into the rule/alert pipeline.
 
     if not ENABLE_AUDITD:
-        print("[engine] Auditd ingest disabled.")
+        print("[ENGINE] Auditd ingest disabled.")
         return
 
-    print(f"[engine] Starting auditd ingest from {AUDIT_LOG_PATH}")
+    print(f"[ENGINE] Starting auditd ingest from {AUDIT_LOG_PATH}")
     try:
         line_stream = follow_file(AUDIT_LOG_PATH, read_existing=READ_EXISTING_AUDIT_LOG)
         event_stream = build_auditd_events_from_stream(_stop_aware_iter(line_stream, stop_event))
@@ -204,7 +204,7 @@ def auditd_ingest_loop(
             process_event(event, rules, alert_log_path, alert_lock)
 
     except Exception as e:
-        print(f"[engine] Auditd ingest encountered an error: {e}", file=sys.stderr)
+        print(f"[ENGINE] Auditd ingest encountered an error: {e}", file=sys.stderr)
 
 
 def journald_ingest_loop(
@@ -216,11 +216,11 @@ def journald_ingest_loop(
     # ingest loop for journald using journalctl -o json --since=now -f and parse_journald_stream.
 
     if not ENABLE_JOURNALD:
-        print("[engine] Journald ingest disabled.")
+        print("[ENGINE] Journald ingest disabled.")
         return
 
     cmd = ["journalctl", "-o", "json", "--since=now", "-f"]
-    print(f"[engine] Starting journald ingest: {' '.join(cmd)}")
+    print(f"[ENGINE] Starting journald ingest: {' '.join(cmd)}")
 
     try:
         proc = subprocess.Popen(
@@ -230,10 +230,10 @@ def journald_ingest_loop(
             text=True,
         )
     except FileNotFoundError:
-        print("[engine] journalctl not found; journald ingest disabled.", file=sys.stderr)
+        print("[ENGINE] journalctl not found; journald ingest disabled.", file=sys.stderr)
         return
     except Exception as e:
-        print(f"[engine] Failed to start journalctl: {e}", file=sys.stderr)
+        print(f"[ENGINE] Failed to start journalctl: {e}", file=sys.stderr)
         return
 
     try:
@@ -277,24 +277,24 @@ def run_engine() -> None:
     try:
         rules = load_rules_from_file(RULES_PATH)
     except FileNotFoundError:
-        print(f"[engine] Rules file not found: {RULES_PATH}", file=sys.stderr)
+        print(f"[ENGINE] Rules file not found: {RULES_PATH}", file=sys.stderr)
         sys.exit(1)
     except Exception as e:
-        print(f"[engine] Failed to load rules from {RULES_PATH}: {e}", file=sys.stderr)
+        print(f"[ENGINE] Failed to load rules from {RULES_PATH}: {e}", file=sys.stderr)
         sys.exit(1)
 
     if not rules:
-        print(f"[engine] WARNING: no rules loaded from {RULES_PATH}", file=sys.stderr)
+        print(f"[ENGINE] WARNING: no rules loaded from {RULES_PATH}", file=sys.stderr)
 
-    print("[engine] Loaded rules:")
+    print("[ENGINE] Loaded rules:")
     for r in rules:
         print(f"  - {r['name']} ({r['severity']})")
 
-    print()
-    print(f"[engine] Alerts will be written to: {ALERT_LOG_PATH}")
-    print(f"[engine] Audit log path           : {AUDIT_LOG_PATH}")
-    print(f"[engine] Journald ingest          : {'enabled' if ENABLE_JOURNALD else 'disabled'}")
-    print("[engine] Press Ctrl+C to stop.\n")
+    print("\n^(;,;)^ CTHULHU ENGINE\n")
+    print(f"    Alerts will be written to : {ALERT_LOG_PATH}")
+    print(f"    Audit log path            : {AUDIT_LOG_PATH}")
+    print(f"    Journald ingest           : {'enabled' if ENABLE_JOURNALD else 'disabled'}")
+    print("[ENGINE] Press Ctrl+C to stop.\n")
 
     alert_lock = threading.Lock()
     stop_event = threading.Event()
@@ -327,12 +327,12 @@ def run_engine() -> None:
         while any(t.is_alive() for t in threads):
             time.sleep(1.0)
     except KeyboardInterrupt:
-        print("\n[engine] Shutdown requested, stopping ingest loops...")
+        print("\n[ENGINE] Shutdown requested, stopping ingest loops...")
         stop_event.set()
         # give threads a moment to clean up
         for t in threads:
             t.join(timeout=5.0)
-        print("[engine] All ingest threads stopped. Exiting.")
+        print("[ENGINE] All ingest threads stopped. Exiting.")
 
 
 def main(argv: List[str] | None = None) -> None:
