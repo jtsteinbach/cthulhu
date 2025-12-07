@@ -29,8 +29,9 @@ def _endswith(value: Any, suffix: Any) -> bool:
 # CONDITION NORMALIZATION
 
 def _normalize_condition_line(line: str) -> str:
-    # normalize a single condition line into safe python. this version uses a
-    # tokenization approach to prevent merging `or` with `_contains` or `_endswith`.
+    # normalize a single condition line into safe python. this version avoids
+    # corrupting existing helper calls like _contains/_endswith and only rewrites
+    # true infix operators: "field contains 'x'" -> _contains(field, 'x')
 
     expr = line.strip()
 
@@ -41,13 +42,14 @@ def _normalize_condition_line(line: str) -> str:
     expr = re.sub(r"\bis\s+not\s+null\b", "is not None", expr)
     expr = re.sub(r"\bis\s+null\b", "is None", expr)
 
-    # tokenize by boolean operators
-    parts = re.split(r'\b(and|or)\b', expr)
+    # tokenize by boolean operators (they become separate tokens)
+    parts = re.split(r"\b(and|or)\b", expr)
 
-    normalized_parts = []
+    normalized_parts: List[str] = []
 
-    # LHS pattern allowing parentheses
-    LHS = r"(\(*\s*[A-Za-z_][A-Za-z0-9_\.]*\s*\)*)"
+    # left-hand side = bare identifier / attribute chain (no parentheses),
+    # so we don't slurp leading "(" into the name.
+    LHS = r"([A-Za-z_][A-Za-z0-9_\.]*)"
 
     for part in parts:
         stripped = part.strip()
@@ -57,15 +59,39 @@ def _normalize_condition_line(line: str) -> str:
             normalized_parts.append(stripped)
             continue
 
-        # NEGATED operators
-        part = re.sub(rf"{LHS}\s+!contains\s+(.*)", r"not _contains(\1, \2)", part)
-        part = re.sub(rf"{LHS}\s+!startswith\s+(.*)", r"not _startswith(\1, \2)", part)
-        part = re.sub(rf"{LHS}\s+!endswith\s+(.*)", r"not _endswith(\1, \2)", part)
+        # NEGATED operators: field !contains value
+        part = re.sub(
+            rf"{LHS}\s+!contains\s+(.*)",
+            r"not _contains(\1, \2)",
+            part,
+        )
+        part = re.sub(
+            rf"{LHS}\s+!startswith\s+(.*)",
+            r"not _startswith(\1, \2)",
+            part,
+        )
+        part = re.sub(
+            rf"{LHS}\s+!endswith\s+(.*)",
+            r"not _endswith(\1, \2)",
+            part,
+        )
 
-        # POSITIVE operators
-        part = re.sub(rf"{LHS}\s+contains\s+(.*)", r"_contains(\1, \2)", part)
-        part = re.sub(rf"{LHS}\s+startswith\s+(.*)", r"_startswith(\1, \2)", part)
-        part = re.sub(rf"{LHS}\s+endswith\s+(.*)", r"_endswith(\1, \2)", part)
+        # POSITIVE operators: field contains value
+        part = re.sub(
+            rf"{LHS}\s+contains\s+(.*)",
+            r"_contains(\1, \2)",
+            part,
+        )
+        part = re.sub(
+            rf"{LHS}\s+startswith\s+(.*)",
+            r"_startswith(\1, \2)",
+            part,
+        )
+        part = re.sub(
+            rf"{LHS}\s+endswith\s+(.*)",
+            r"_endswith(\1, \2)",
+            part,
+        )
 
         normalized_parts.append(part)
 
