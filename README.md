@@ -1,4 +1,4 @@
-![CTHULHU SIEM](https://r2.jts.gg/cth_logo.png)
+![CTHULHU SIEM](https://r2.jts.gg/cth_img.png)
 
 # CTHULHU SIEM
 
