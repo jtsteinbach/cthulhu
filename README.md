@@ -1,5 +1,4 @@
 ![CTHULHU SIEM](https://r2.jts.gg/cth_img.png)
-
 # CTHULHU SIEM
 
 **CTHULHU SIEM** is a small, Linux-focused SIEM built in **100% Python (standard library only)**.
