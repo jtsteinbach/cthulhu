@@ -172,8 +172,8 @@ def print_alert_line(alert: Dict[str, Any]) -> None:
     rule_name = rule.get("name") or "unknown_rule"
     description = rule.get("description") or ""
 
-    summary = alert.get("event_summary") or {}
-    msg = summary.get("message") or description
+    meta = alert.get("event_meta") or {}
+    msg = meta.get("message") or description
 
     severity_color = _format_severity(severity)
 
@@ -305,12 +305,11 @@ def triage_alert_by_uid(path: str) -> None:
     # unpack structures with sane defaults
     rule: Dict[str, Any] = alert.get("rule", {}) or {}
     event_meta: Dict[str, Any] = alert.get("event_meta", {}) or {}
-    event_summary: Dict[str, Any] = alert.get("event_summary", {}) or {}
     event: Dict[str, Any] = alert.get("event", {}) or {}
 
-    summary = event_summary or event_meta or event
+    summary = event_meta or event
 
-    # --- basic alert fields ---
+    # basic alert field
     alert_uid = alert.get("uid") or alert.get("alert_id") or "unknown"
     alert_time = alert.get("alert_timestamp") or event.get("timestamp") or "unknown-time"
     rule_name = rule.get("name") or "unknown_rule"
@@ -319,14 +318,14 @@ def triage_alert_by_uid(path: str) -> None:
 
     severity_fmt = _format_severity(severity)
 
-    # --- source context ---
+    # source context
     source = _extract_first(["source"], summary, event_meta, event, default="unknown")
     category = _extract_first(["category"], summary, event_meta, event, default="unknown")
     outcome = _extract_first(["outcome"], summary, event_meta, event, default=None)
     success_val = _extract_first(["success", "success_bool"], summary, event_meta, event, default=None)
     host = _extract_first(["host", "hostname"], summary, event_meta, event, default="(local)")
 
-    # --- process context ---
+    # process context
     process_name = _extract_first(
         ["process_name", "exe_basename", "comm", "command"],
         summary,
@@ -343,13 +342,13 @@ def triage_alert_by_uid(path: str) -> None:
     session = _extract_first(["session", "ses"], summary, event_meta, event, default="-")
     interactive = _extract_first(["interactive"], summary, event_meta, event, default=None)
 
-    # --- file context (auditd) ---
+    # file context (auditd)
     target_path = _extract_first(["target_path"], summary, event_meta, event, default=None)
     file_name = _extract_first(["file_name"], summary, event_meta, event, default=None)
     file_ext = _extract_first(["file_ext"], summary, event_meta, event, default=None)
     filepath_raw = _extract_first(["filepath"], summary, event_meta, event, default=None)
 
-    # --- identity / privilege ---
+    # identity / privilege
     uid_val = _extract_first(["uid"], summary, event_meta, event, default=None)
     euid_val = _extract_first(["euid", "EUID"], summary, event_meta, event, default=None)
     auid_val = _extract_first(["auid", "AUID"], summary, event_meta, event, default=None)
@@ -388,7 +387,7 @@ def triage_alert_by_uid(path: str) -> None:
 
     privilege_color = RED if is_root else YELLOW if "PRIVILEGED" in privilege_level else GREEN
 
-    # --- audit context ---
+    # audit context
     syscall_num = _extract_first(["syscall"], summary, event_meta, event, default=None)
     syscall_name = None
     serial = _extract_first(["serial", "event_id"], event, default=None)
@@ -403,7 +402,7 @@ def triage_alert_by_uid(path: str) -> None:
 
     record_types = Counter(rec.get("type", "unknown") for rec in event.get("records", []))
 
-    # --- journald log context (if applicable) ---
+    # journald log context (if applicable)
     service_name = _extract_first(["service_name"], summary, event_meta, event, default=None)
     log_unit = _extract_first(["log_unit", "unit"], summary, event_meta, event, default=None)
     log_priority_label = _extract_first(["log_priority_label"], summary, event_meta, event, default=None)
