@@ -75,28 +75,107 @@ def read_alerts_from_file(path: str) -> List[Dict[str, Any]]:
     return alerts
 
 
+def _truncate(value: Optional[str], max_len: int = 120) -> str:
+    """Truncate long strings for CLI display."""
+    if not value:
+        return "-"
+    if len(value) <= max_len:
+        return value
+    return value[: max_len - 3] + "..."
+
+
+def _format_bool(value: Any) -> str:
+    """Return a pretty boolean string with color."""
+    if isinstance(value, bool):
+        if value:
+            return f"{GREEN}true{GRAY}"
+        return f"{RED}false{GRAY}"
+
+    # handle common string-ish forms
+    s = str(value).strip().lower()
+    if s in ("1", "yes", "y", "true"):
+        return f"{GREEN}true{GRAY}"
+    if s in ("0", "no", "n", "false"):
+        return f"{RED}false{GRAY}"
+    return f"{GRAY}{value}{GRAY}"
+
+
+def _format_severity(severity: Any) -> str:
+    """Return severity with the same colors everywhere."""
+    sev = (str(severity) or "unknown").upper()
+    if sev == "HIGH":
+        color = RED
+    elif sev == "MEDIUM":
+        color = YELLOW
+    elif sev == "LOW":
+        color = WHITE
+    else:
+        color = GRAY
+    return f"{color}[{sev}]{GRAY}"
+
+
+def _extract_first(
+    keys: List[str],
+    *sources: Dict[str, Any],
+    default: Any = None,
+) -> Any:
+    """
+    Return the first non-None / non-empty value among a list of keys
+    searched across the provided dicts in order.
+    """
+    for src in sources:
+        if not src:
+            continue
+        for k in keys:
+            if k in src and src[k] not in (None, ""):
+                return src[k]
+    return default
+
+
+def _extract_identity_from_records(event: Dict[str, Any]) -> Dict[str, Any]:
+    """
+    Pull human-friendly user/group names from auditd records if present.
+    e.g., UID="root", AUID="root", GID="root", etc.
+    """
+    result: Dict[str, Any] = {
+        "uid_name": None,
+        "euid_name": None,
+        "auid_name": None,
+        "gid_name": None,
+        "egid_name": None,
+    }
+
+    for rec in event.get("records", []):
+        fields = rec.get("fields", {}) or {}
+        if result["uid_name"] is None and "UID" in fields:
+            result["uid_name"] = fields["UID"]
+        if result["euid_name"] is None and "EUID" in fields:
+            result["euid_name"] = fields["EUID"]
+        if result["auid_name"] is None and "AUID" in fields:
+            result["auid_name"] = fields["AUID"]
+        if result["gid_name"] is None and "GID" in fields:
+            result["gid_name"] = fields["GID"]
+        if result["egid_name"] is None and "EGID" in fields:
+            result["egid_name"] = fields["EGID"]
+
+    return result
+
+
 def print_alert_line(alert: Dict[str, Any]) -> None:
     # print a single alert in a human-readable summary line.
-    
+
     ts = alert.get("alert_timestamp") or "unknown-time"
     uid = alert.get("uid") or alert.get("alert_id") or "unknown-uid"
 
     rule = alert.get("rule", {})
-    severity = str((rule.get("severity") or "unknown").upper())
+    severity = rule.get("severity") or "unknown"
     rule_name = rule.get("name") or "unknown_rule"
     description = rule.get("description") or ""
 
     summary = alert.get("event_summary") or {}
     msg = summary.get("message") or description
 
-    if severity == "HIGH":
-        severity_color = f"{RED}[{severity}]"
-    elif severity == "MEDIUM":
-        severity_color = f"{YELLOW}[{severity}]"
-    elif severity == "LOW":
-        severity_color = f"{WHITE}[{severity}]"
-    else:
-        severity_color = f"{GRAY}[{severity}]"
+    severity_color = _format_severity(severity)
 
     print(f"{D_GRAY}    {ts} {D_GRAY}[{uid}] {severity_color} {AQUA}[{rule_name}] {GRAY}{msg}")
 
@@ -108,7 +187,7 @@ def tail_alerts_live(
     severity_filter: Optional[str] = None,
 ) -> None:
     # live alert feed with optional severity filter.
-    
+
     if not os.path.exists(path):
         print(f"{GRAY}    Alert log file not found: {path}")
         input(ENTER_BUTTON)
@@ -148,7 +227,7 @@ def tail_alerts_live(
                             buffer.append(alert)
                         except json.JSONDecodeError:
                             pass
-                            
+
                 clear_screen()
                 print(f"""
     {GREEN}┌──────────────────────────────┐
@@ -184,7 +263,7 @@ def tail_alerts_live(
 
 def _find_alert_by_uid(path: str, uid: str) -> Optional[Dict[str, Any]]:
     # search the alerts file for an alert with the given uid.
-    
+
     if not os.path.exists(path):
         return None
 
@@ -206,8 +285,9 @@ def _find_alert_by_uid(path: str, uid: str) -> Optional[Dict[str, Any]]:
 
 
 def triage_alert_by_uid(path: str) -> None:
-    # prompt the user for an alert uid, search for it, and display full details.
-    
+    # prompt the user for an alert uid, search for it, and display full details
+    # in a triage-friendly, summarized format.
+
     uid = input(f"{GREEN}    Enter Alert UID > ").strip()
     if not uid:
         print(f"{GRAY}    No UID entered.")
@@ -222,11 +302,114 @@ def triage_alert_by_uid(path: str) -> None:
         input(ENTER_BUTTON)
         return
 
-    rule = alert.get("rule", {})
-    event_meta = alert.get("event_meta", {})
-    event_summary = alert.get("event_summary", {})
-    event = alert.get("event", {})
+    # unpack structures with sane defaults
+    rule: Dict[str, Any] = alert.get("rule", {}) or {}
+    event_meta: Dict[str, Any] = alert.get("event_meta", {}) or {}
+    event_summary: Dict[str, Any] = alert.get("event_summary", {}) or {}
+    event: Dict[str, Any] = alert.get("event", {}) or {}
 
+    summary = event_summary or event_meta or event
+
+    # --- basic alert fields ---
+    alert_uid = alert.get("uid") or alert.get("alert_id") or "unknown"
+    alert_time = alert.get("alert_timestamp") or event.get("timestamp") or "unknown-time"
+    rule_name = rule.get("name") or "unknown_rule"
+    severity = rule.get("severity") or "unknown"
+    description = rule.get("description") or "(no description)"
+
+    severity_fmt = _format_severity(severity)
+
+    # --- source context ---
+    source = _extract_first(["source"], summary, event_meta, event, default="unknown")
+    category = _extract_first(["category"], summary, event_meta, event, default="unknown")
+    outcome = _extract_first(["outcome"], summary, event_meta, event, default=None)
+    success_val = _extract_first(["success", "success_bool"], summary, event_meta, event, default=None)
+    host = _extract_first(["host", "hostname"], summary, event_meta, event, default="(local)")
+
+    # --- process context ---
+    process_name = _extract_first(
+        ["process_name", "exe_basename", "comm", "command"],
+        summary,
+        event_meta,
+        event,
+        default="unknown",
+    )
+    exe = _extract_first(["exe", "process_path"], summary, event_meta, event, default="-")
+    cmdline = _extract_first(["command_line", "cmdline"], summary, event_meta, event, default="")
+    cwd = _extract_first(["cwd"], summary, event_meta, event, default="-")
+    pid = _extract_first(["pid", "process_id"], summary, event_meta, event, default="-")
+    ppid = _extract_first(["ppid", "parent_pid"], summary, event_meta, event, default="-")
+    tty = _extract_first(["tty"], summary, event_meta, event, default="-")
+    session = _extract_first(["session", "ses"], summary, event_meta, event, default="-")
+    interactive = _extract_first(["interactive"], summary, event_meta, event, default=None)
+
+    # --- file context (auditd) ---
+    target_path = _extract_first(["target_path"], summary, event_meta, event, default=None)
+    file_name = _extract_first(["file_name"], summary, event_meta, event, default=None)
+    file_ext = _extract_first(["file_ext"], summary, event_meta, event, default=None)
+    filepath_raw = _extract_first(["filepath"], summary, event_meta, event, default=None)
+
+    # --- identity / privilege ---
+    uid_val = _extract_first(["uid"], summary, event_meta, event, default=None)
+    euid_val = _extract_first(["euid", "EUID"], summary, event_meta, event, default=None)
+    auid_val = _extract_first(["auid", "AUID"], summary, event_meta, event, default=None)
+    gid_val = _extract_first(["gid", "GID"], summary, event_meta, event, default=None)
+    egid_val = _extract_first(["egid", "EGID"], summary, event_meta, event, default=None)
+
+    uid_str = "-" if uid_val is None else str(uid_val)
+    euid_str = "-" if euid_val is None else str(euid_val)
+    auid_str = "-" if auid_val is None else str(auid_val)
+    gid_str = "-" if gid_val is None else str(gid_val)
+    egid_str = "-" if egid_val is None else str(egid_val)
+
+    # pull name forms from auditd records (UID="root", etc.)
+    identity_names = _extract_identity_from_records(event)
+    uid_name = identity_names.get("uid_name")
+    euid_name = identity_names.get("euid_name")
+    auid_name = identity_names.get("auid_name")
+    gid_name = identity_names.get("gid_name")
+    egid_name = identity_names.get("egid_name")
+
+    # compute privilege level
+    privilege_level = "UNPRIVILEGED"
+    is_root = False
+    try:
+        numeric_uid = int(uid_val) if uid_val is not None else None
+        if numeric_uid == 0:
+            privilege_level = "ROOT"
+            is_root = True
+        elif numeric_uid is not None and numeric_uid < 1000:
+            privilege_level = "PRIVILEGED (uid < 1000)"
+    except Exception:
+        # fall back to name-based heuristic
+        if str(uid_name).lower() == "root":
+            privilege_level = "ROOT"
+            is_root = True
+
+    privilege_color = RED if is_root else YELLOW if "PRIVILEGED" in privilege_level else GREEN
+
+    # --- audit context ---
+    syscall_num = _extract_first(["syscall"], summary, event_meta, event, default=None)
+    syscall_name = None
+    serial = _extract_first(["serial", "event_id"], event, default=None)
+    epoch = _extract_first(["epoch"], summary, event_meta, event, default=None)
+
+    for rec in event.get("records", []):
+        fields = rec.get("fields", {}) or {}
+        if "SYSCALL" in fields and not syscall_name:
+            syscall_name = fields["SYSCALL"]
+        if not serial and "serial" in rec:
+            serial = rec["serial"]
+
+    record_types = Counter(rec.get("type", "unknown") for rec in event.get("records", []))
+
+    # --- journald log context (if applicable) ---
+    service_name = _extract_first(["service_name"], summary, event_meta, event, default=None)
+    log_unit = _extract_first(["log_unit", "unit"], summary, event_meta, event, default=None)
+    log_priority_label = _extract_first(["log_priority_label"], summary, event_meta, event, default=None)
+    message_snippet = _extract_first(["message_snippet", "log_message", "message"], summary, event_meta, event, default=None)
+
+    # header
     print(f"""
     {GREEN}┌──────────────────────────────┐
     {GREEN}│                              │
@@ -237,36 +420,135 @@ def triage_alert_by_uid(path: str) -> None:
     {GREEN}│                              │
     {GREEN}│       {WHITE}ALERT INFORMATION      {GREEN}│
     {GREEN}└──────────────────────────────┘
+""")
 
-    {GRAY}Alert UID      : {YELLOW}{alert.get('uid') or alert.get('alert_id')}
-    {GRAY}Alert Time     : {WHITE}{alert.get('alert_timestamp')}
-    {GRAY}Rule Name      : {AQUA}{rule.get('name')}
-    {GRAY}Severity       : {YELLOW}{rule.get('severity')}
-    {GRAY}Description    : {WHITE}{rule.get('description')}
-
+    # ALERT OVERVIEW
+    print(f"""
     {GREEN}┌──────────────────────────────┐
-    {GREEN}│          {YELLOW}EVENT META          {GREEN}│
+    {GREEN}│        {AQUA}ALERT OVERVIEW        {GREEN}│
     {GREEN}└──────────────────────────────┘
 
-    {GRAY}{json.dumps(event_meta, indent=2, sort_keys=True)}
+    {GRAY}Alert UID      : {YELLOW}{alert_uid}
+    {GRAY}Alert Time     : {WHITE}{alert_time}
+    {GRAY}Rule Name      : {AQUA}{rule_name}
+    {GRAY}Severity       : {severity_fmt}
+    {GRAY}Description    : {WHITE}{description}
+""")
 
+    # SOURCE CONTEXT
+    success_str = _format_bool(success_val) if success_val is not None else f"{GRAY}-"
+    outcome_str = outcome if outcome is not None else "-"
+    print(f"""
     {GREEN}┌──────────────────────────────┐
-    {GREEN}│        {YELLOW}EVENT SUMMARY         {GREEN}│
+    {GREEN}│        {AQUA}SOURCE CONTEXT        {GREEN}│
     {GREEN}└──────────────────────────────┘
 
-    {GRAY}{json.dumps(event_summary, indent=2, sort_keys=True)}
+    {GRAY}Source         : {WHITE}{source}
+    {GRAY}Category       : {WHITE}{category}
+    {GRAY}Outcome        : {WHITE}{outcome_str}  {success_str}
+    {GRAY}Host           : {WHITE}{host}
+""")
 
+    # PROCESS CONTEXT
+    cmdline_display = _truncate(cmdline)
+    print(f"""
     {GREEN}┌──────────────────────────────┐
-    {GREEN}│         {YELLOW}FULL SUMMARY         {GREEN}│
+    {GREEN}│       {AQUA}PROCESS CONTEXT        {GREEN}│
     {GREEN}└──────────────────────────────┘
 
-    {GRAY}{json.dumps(event, indent=2, sort_keys=True)}""")
+    {GRAY}Process        : {WHITE}{process_name}{GRAY} (PID {WHITE}{pid}{GRAY}, PPID {WHITE}{ppid}{GRAY})
+    {GRAY}Executable     : {WHITE}{exe}
+    {GRAY}Command Line   : {WHITE}{cmdline_display}
+    {GRAY}CWD            : {WHITE}{cwd}
+    {GRAY}TTY / Session  : {WHITE}{tty}{GRAY} / {WHITE}{session}
+""")
+
+    if interactive is not None:
+        print(f"    {GRAY}Interactive    : {_format_bool(interactive)}\n")
+    else:
+        print(f"    {GRAY}Interactive    : {WHITE}-\n")
+
+    # FILE CONTEXT (only if relevant fields exist)
+    if target_path or file_name or file_ext or filepath_raw:
+        print(f"""
+    {GREEN}┌──────────────────────────────┐
+    {GREEN}│         {AQUA}FILE CONTEXT         {GREEN}│
+    {GREEN}└──────────────────────────────┘
+""")
+        if target_path:
+            print(f"    {GRAY}Target Path    : {WHITE}{target_path}")
+        if filepath_raw and filepath_raw != target_path:
+            print(f"    {GRAY}Raw Filepath   : {WHITE}{filepath_raw}")
+        if file_name:
+            print(f"    {GRAY}File Name      : {WHITE}{file_name}")
+        if file_ext:
+            print(f"    {GRAY}File Ext       : {WHITE}{file_ext}\n")
+
+    # IDENTITY / PRIVILEGE (cleaned)
+    effective_display = f"{euid_name} (uid={uid_str})" if euid_name else f"uid={uid_str}"
+    audit_display = f"{auid_name} (auid={auid_str})" if auid_name else f"auid={auid_str}"
+    real_display = f"{uid_name} (uid={uid_str})" if uid_name else f"uid={uid_str}"
+    group_display = f"{gid_name} (gid={gid_str})" if gid_name else f"gid={gid_str}"
+    egid_display = f"{egid_name} (egid={egid_str})" if egid_name else f"egid={egid_str}"
+
+    print(f"""
+    {GREEN}┌──────────────────────────────┐
+    {GREEN}│    {AQUA}IDENTITY / PRIVILEGE      {GREEN}│
+    {GREEN}└──────────────────────────────┘
+
+    {GRAY}Effective User : {WHITE}{effective_display}
+    {GRAY}Real User      : {WHITE}{real_display}
+    {GRAY}Audit User     : {WHITE}{audit_display}
+    {GRAY}Groups         : {WHITE}{group_display}{GRAY} / {WHITE}{egid_display}
+    {GRAY}Privilege      : {privilege_color}{privilege_level}{GRAY}
+""")
+
+    # AUDIT CONTEXT
+    syscall_display = "-"
+    if syscall_num is not None and syscall_name:
+        syscall_display = f"{syscall_num} ({syscall_name})"
+    elif syscall_num is not None:
+        syscall_display = str(syscall_num)
+    elif syscall_name:
+        syscall_display = syscall_name
+
+    epoch_display = str(epoch) if epoch is not None else "-"
+
+    print(f"""
+    {GREEN}┌──────────────────────────────┐
+    {GREEN}│         {AQUA}AUDIT CONTEXT        {GREEN}│
+    {GREEN}└──────────────────────────────┘
+
+    {GRAY}Syscall        : {WHITE}{syscall_display}
+    {GRAY}Audit Serial   : {WHITE}{serial if serial is not None else "-"}
+    {GRAY}Epoch          : {WHITE}{epoch_display}
+""")
+
+    # LOG CONTEXT (journald / log-style events)
+    if source == "journald" or service_name or message_snippet or log_priority_label:
+        print(f"""
+    {GREEN}┌──────────────────────────────┐
+    {GREEN}│         {AQUA}LOG CONTEXT         {GREEN}│
+    {GREEN}└──────────────────────────────┘
+""")
+        if service_name:
+            print(f"    {GRAY}Service        : {WHITE}{service_name}")
+        if log_unit:
+            print(f"    {GRAY}Unit           : {WHITE}{log_unit}")
+        if log_priority_label:
+            print(f"    {GRAY}Priority       : {WHITE}{log_priority_label}")
+        if message_snippet:
+            print(f"    {GRAY}Message        : {WHITE}{_truncate(str(message_snippet), 160)}\n")
+
+    print(f"\n    {GRAY}Use {YELLOW}EXPORT ALERT{GRAY} from the main menu to view")
+    print(f"    the full raw JSON event for deeper forensics.\n")
+
     input(ENTER_BUTTON)
 
 
 def export_alert_by_uid(path: str) -> None:
     # prompt for an alert uid and export that alert as pretty json to a file.
-    
+
     uid = input(f"{GREEN}    Enter alert UID to export > ").strip()
     if not uid:
         print(f"{GRAY}    No UID entered.")
@@ -305,7 +587,7 @@ def export_alert_by_uid(path: str) -> None:
 
 def view_loaded_rules() -> None:
     # load and display all rule names from the rules file.
-    
+
     if not os.path.exists(RULES_PATH):
         print(f"{GRAY}    Rules file not found: {RULES_PATH}")
         input(ENTER_BUTTON)
@@ -349,7 +631,7 @@ def view_loaded_rules() -> None:
 
 def view_search_all_alerts(path: str) -> None:
     # display all alerts in summary format with optional rule-name filter.
-    
+
     if not os.path.exists(path):
         print(f"{GRAY}    Alert log file not found: {path}")
         input(ENTER_BUTTON)
@@ -397,7 +679,7 @@ def view_search_all_alerts(path: str) -> None:
 
 def view_alert_stats(path: str) -> None:
     # show simple stats about alerts in the file: total, per severity, per rule.
-    
+
     alerts = read_alerts_from_file(path)
 
     clear_screen()
@@ -447,7 +729,7 @@ def view_alert_stats(path: str) -> None:
 
 def main_menu() -> None:
     # main interactive menu loop.
-    
+
     while True:
         clear_screen()
         print(f"""
