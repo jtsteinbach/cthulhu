@@ -22,10 +22,9 @@ __all__ = [
 
 
 # SOURCES
-
-# sources:
-#     * auditd   (typically /var/log/audit/audit.log)
-#     * journald (typically via `journalctl -o json`)
+#
+# auditd   (typically /var/log/audit/audit.log)
+# journald (typically via `journalctl -o json`)
 #
 # for auditd, we expose:
 #     - low-level record parsing per log line (parse_auditd_record_line / stream).
