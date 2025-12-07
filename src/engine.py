@@ -124,7 +124,7 @@ def _enrich_parent_process(event: Dict[str, Any]) -> Dict[str, Any]:
 
     parent_info = _resolve_parent_process_info(ppid)
 
-    # Only set keys if we actually attempted resolution; don't touch existing keys
+    # only set keys if we actually attempted resolution; don't touch existing keys
     # if user wants to inject their own values upstream.
     if "parent_process_name" not in event:
         event["parent_process_name"] = parent_info.get("parent_process_name")
