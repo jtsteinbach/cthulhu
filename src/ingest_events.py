@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 # CTHULHU module    ingest_events.py
 
 from __future__ import annotations
