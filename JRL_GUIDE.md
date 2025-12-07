@@ -21,6 +21,7 @@ name(severity)
 ```
 
 All `:` conditions must be true.
+Severities: LOW, MEDIUM, HIGH
 
 ---
 
