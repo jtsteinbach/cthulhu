@@ -81,7 +81,7 @@ reverse_shell_netcat(high)
 - Header: `<rule_name>(<severity>)`
 - Description line: `| "Human readable description"`
 - Conditions: one or more `:` lines (all ANDed)
-- Helpers: `_contains`, `_startswith`, `_endswith`
+- Helpers: `contains`, `startswith`, `endswith`
 - Literals like `true`, `false`, `null` are normalized internally
 
 Rules are stored in:
