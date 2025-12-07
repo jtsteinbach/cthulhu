@@ -452,12 +452,12 @@ def triage_alert_by_uid(path: str) -> None:
     {GREEN}│       {AQUA}PROCESS CONTEXT        {GREEN}│
     {GREEN}└──────────────────────────────┘
 
-    {GRAY}Process        : {WHITE}{process_name}{GRAY} (PID {WHITE}{pid}{GRAY}, PPID {WHITE}{ppid}{GRAY})
+    {GRAY}Process        : {WHITE}{process_name}{GRAY} (PID {WHITE}{pid}{GRAY})
+    {GRAY}Parent Process : {WHITE}{ppid_name} {GRAY}(PID {ppid}) ({ppid_path})
     {GRAY}Executable     : {WHITE}{exe}
     {GRAY}Command Line   : {WHITE}{cmdline_display}
     {GRAY}CWD            : {WHITE}{cwd}
-    {GRAY}TTY / Session  : {WHITE}{tty}{GRAY} / {WHITE}{session}
-""")
+    {GRAY}TTY / Session  : {WHITE}{tty}{GRAY} / {WHITE}{session}""")
 
     if interactive is not None:
         print(f"    {GRAY}Interactive    : {_format_bool(interactive)}\n")
