@@ -369,12 +369,10 @@ def build_alert(event: Dict[str, Any], match: Dict[str, Any]) -> Dict[str, Any]:
     }
 
     event_meta = _build_event_meta(event)
-    event_summary = _build_event_summary(event)
     rule_highlights = _build_rule_highlights(match, event_meta)
 
     # dict insertion order is preserved (python 3.7+),
     # and json.dumps(sort_keys=false) respects it.
-    # put rule_highlights first so triage sees the why immediately.
     alert: Dict[str, Any] = {}
 
     if rule_highlights:
@@ -385,7 +383,6 @@ def build_alert(event: Dict[str, Any], match: Dict[str, Any]) -> Dict[str, Any]:
     alert["alert_timestamp"] = alert_timestamp
     alert["rule"] = rule_info
     alert["event_meta"] = event_meta
-    alert["event_summary"] = event_summary
     alert["event"] = event  # full normalized event
 
     return alert
