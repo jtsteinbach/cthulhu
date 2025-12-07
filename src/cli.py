@@ -326,18 +326,15 @@ def triage_alert_by_uid(path: str) -> None:
     host = _extract_first(["host", "hostname"], summary, event_meta, event, default="(local)")
 
     # process context
-    process_name = _extract_first(
-        ["process_name", "exe_basename", "comm", "command"],
-        summary,
-        event_meta,
-        event,
-        default="unknown",
-    )
+    process_name = _extract_first(["process_name", "exe_basename", "comm", "command"], summary, event_meta, event, default="unknown")
     exe = _extract_first(["exe", "process_path"], summary, event_meta, event, default="-")
     cmdline = _extract_first(["command_line", "cmdline"], summary, event_meta, event, default="")
     cwd = _extract_first(["cwd"], summary, event_meta, event, default="-")
     pid = _extract_first(["pid", "process_id"], summary, event_meta, event, default="-")
     ppid = _extract_first(["ppid", "parent_pid"], summary, event_meta, event, default="-")
+    ppid_name = _extract_first(["parent_process_name"], summary, event_meta, event, default="-")
+    ppid_path = _extract_first(["parent_process_path"], summary, event_meta, event, default="-")
+    
     tty = _extract_first(["tty"], summary, event_meta, event, default="-")
     session = _extract_first(["session", "ses"], summary, event_meta, event, default="-")
     interactive = _extract_first(["interactive"], summary, event_meta, event, default=None)
