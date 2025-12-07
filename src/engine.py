@@ -77,7 +77,7 @@ def follow_file(path: str, read_existing: bool = False) -> Iterable[str]:
 
 
 def _resolve_parent_process_info(ppid: int) -> Dict[str, Any]:
-    # Best-effort resolution of parent process metadata, similar to what `top`/`ps` show,
+    # best-effort resolution of parent process metadata, similar to what `top`/`ps` show,
     # but preferring live /proc information when available.
     
     parent_name: str | None = None
