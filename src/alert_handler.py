@@ -1,6 +1,5 @@
-"""
-alert_handler.py
-"""
+#!/usr/bin/env python3
+# CTHULHU module    alert_handler.py
 
 from __future__ import annotations
 
@@ -12,38 +11,34 @@ from datetime import datetime, timezone
 from typing import Any, Dict, List
 
 
-# Time / ID helpers
+# TIME / ID HELPERS
 
 def _pst_timestamp() -> str:
-    """Return current PST time."""
+    # return current pst time.
+
     pacific = zoneinfo.ZoneInfo("America/Los_Angeles")
     return datetime.now(pacific).strftime("%m-%d-%Y %I:%M:%S %p %Z")
 
 
 def _generate_uuid() -> str:
-    """Generate unique id."""
+    # generate unique id.
+
     return os.urandom(6).hex().upper()
 
 
-# Normalization helpers
+# NORMALIZATION HELPERS
 
 def _normalize_success(value: Any) -> Dict[str, Any]:
-    """
-    Normalize various 'success' representations into a bool + outcome label.
+    # normalize various success representations into a bool plus outcome label.
+    # returns a dict that may contain success_bool and outcome keys.
 
-    Returns a dict that may contain:
-        {
-            "success_bool": True/False,
-            "outcome": "success" / "failure"
-        }
-    """
     result: Dict[str, Any] = {}
     success_bool: bool | None = None
 
     if isinstance(value, bool):
         success_bool = value
     elif isinstance(value, (int, float)):
-        # Treat non-zero as success, zero as failure
+        # treat non-zero as success, zero as failure
         success_bool = bool(value)
     elif isinstance(value, str):
         v = value.strip().lower()
@@ -59,7 +54,7 @@ def _normalize_success(value: Any) -> Dict[str, Any]:
     return result
 
 
-# Basic journald priority labels for more intuitive JRL conditions.
+# basic journald priority labels for more intuitive JRL conditions.
 _JOURNALD_PRIORITY_LABELS: Dict[int, str] = {
     0: "emergency",
     1: "alert",
@@ -72,12 +67,11 @@ _JOURNALD_PRIORITY_LABELS: Dict[int, str] = {
 }
 
 
-# Enrichment: auditd
+# ENRICHMENT: AUDITD
 
 def _derive_auditd_enrichment(event: Dict[str, Any]) -> Dict[str, Any]:
-    """
-    Build enrichment fields specifically for auditd events.
-    """
+    # build enrichment fields specifically for auditd events.
+
     enrichment: Dict[str, Any] = {}
 
     exe = event.get("exe")
@@ -88,7 +82,7 @@ def _derive_auditd_enrichment(event: Dict[str, Any]) -> Dict[str, Any]:
     pid = event.get("pid")
     ppid = event.get("ppid")
 
-    # Command line: prefer full command if present, otherwise exe path.
+    # command line: prefer full command if present, otherwise exe path.
     command_line: str | None = None
     if isinstance(command, str) and command.strip():
         command_line = command.strip()
@@ -98,7 +92,7 @@ def _derive_auditd_enrichment(event: Dict[str, Any]) -> Dict[str, Any]:
     if command_line:
         enrichment["command_line"] = command_line
 
-    # Process path / name
+    # process path / name
     if isinstance(exe, str) and exe.strip():
         process_path = exe.strip()
         enrichment["process_path"] = process_path
@@ -106,13 +100,13 @@ def _derive_auditd_enrichment(event: Dict[str, Any]) -> Dict[str, Any]:
         enrichment["process_name"] = exe_basename
         enrichment["exe_basename"] = exe_basename
 
-    # Process IDs (aliases)
+    # process ids (aliases)
     if pid is not None:
         enrichment["process_id"] = pid
     if ppid is not None:
         enrichment["parent_pid"] = ppid
 
-    # Target file path: combine cwd + filepath when filepath is relative
+    # target file path: combine cwd plus filepath when filepath is relative
     target_path: str | None = None
     if isinstance(filepath, str) and filepath.strip():
         fp = filepath.strip()
@@ -126,28 +120,27 @@ def _derive_auditd_enrichment(event: Dict[str, Any]) -> Dict[str, Any]:
     if target_path:
         enrichment["target_path"] = target_path
 
-        # Derive name + extension from path
+        # derive name and extension from path
         file_name = os.path.basename(target_path)
         if file_name:
             enrichment["file_name"] = file_name
             if "." in file_name and not file_name.startswith("."):
                 enrichment["file_ext"] = file_name.rsplit(".", 1)[-1].lower()
 
-    # Interactive vs non-interactive execution
+    # interactive vs non-interactive execution
     if isinstance(tty, str) and tty.strip():
         t = tty.strip().lower()
-        # Heuristic: non-interactive auditd often uses "?" or "none"
+        # heuristic: non-interactive auditd often uses "?" or "none"
         enrichment["interactive"] = t not in {"?", "none", "null"}
 
     return enrichment
 
 
-# Enrichment: journald
+# ENRICHMENT: JOURNALD
 
 def _derive_journald_enrichment(event: Dict[str, Any]) -> Dict[str, Any]:
-    """
-    Build enrichment fields specifically for journald events.
-    """
+    # build enrichment fields specifically for journald events.
+
     enrichment: Dict[str, Any] = {}
 
     message = event.get("message")
@@ -161,14 +154,14 @@ def _derive_journald_enrichment(event: Dict[str, Any]) -> Dict[str, Any]:
 
     if isinstance(unit, str) and unit:
         enrichment["log_unit"] = unit
-        # Derive a cleaner service_name from typical ".service" units
+        # derive a cleaner service_name from typical ".service" units
         if unit.endswith(".service"):
             enrichment["service_name"] = unit.rsplit(".", 1)[0]
 
     if facility is not None:
         enrichment["log_facility"] = facility
 
-    # Normalize priority to an int if possible
+    # normalize priority to an int if possible
     priority_int: int | None = None
     if isinstance(priority_raw, int):
         priority_int = priority_raw
@@ -184,7 +177,7 @@ def _derive_journald_enrichment(event: Dict[str, Any]) -> Dict[str, Any]:
         if label:
             enrichment["log_priority_label"] = label
 
-        # Basic severity flags to make JRL conditions simpler
+        # basic severity flags to make JRL conditions simpler
         enrichment["is_error"] = priority_int <= 3
         enrichment["is_warning"] = priority_int == 4
         enrichment["is_info"] = priority_int == 6
@@ -192,16 +185,12 @@ def _derive_journald_enrichment(event: Dict[str, Any]) -> Dict[str, Any]:
     return enrichment
 
 
-# Meta + Summary builders
+# META + SUMMARY BUILDERS
 
 def _build_event_meta(event: Dict[str, Any]) -> Dict[str, Any]:
-    """
-    Extract normalized meta fields from the event for quick querying
-    without drilling into the full event structure.
+    # extract normalized meta fields from the event for quick querying.
+    # includes enrichment aliases and derived fields to make JRL rules expressive.
 
-    This includes enrichment aliases and derived fields
-    to make JRL rules more expressive and intuitive.
-    """
     source = event.get("source")
 
     meta: Dict[str, Any] = {
@@ -212,7 +201,7 @@ def _build_event_meta(event: Dict[str, Any]) -> Dict[str, Any]:
         "category": event.get("category"),
     }
 
-    # Normalize "success" into structured fields, but keep raw value too.
+    # normalize success into structured fields, but keep raw value too.
     success_raw = event.get("success")
     if success_raw is not None:
         meta["success"] = success_raw
@@ -250,12 +239,9 @@ def _build_event_meta(event: Dict[str, Any]) -> Dict[str, Any]:
 
 
 def _build_event_summary(event: Dict[str, Any]) -> Dict[str, Any]:
-    """
-    Build a concise, human-oriented summary of the event for triage displays.
+    # build a concise human-oriented summary of the event for triage displays.
+    # mirrors the enrichment used in meta so triage and JRL share vocabulary.
 
-    This mirrors the enrichment used in meta, so triage and JRL share the
-    same vocabulary (command_line, process_name, target_path, etc.).
-    """
     source = event.get("source")
 
     summary: Dict[str, Any] = {
@@ -300,7 +286,7 @@ def _build_event_summary(event: Dict[str, Any]) -> Dict[str, Any]:
     return summary
 
 
-# "Why did this fire?" helpers
+# "WHY DID THIS FIRE?" HELPERS
 
 _FIELD_TOKEN_RE = re.compile(r"\b[a-zA-Z_][a-zA-Z0-9_]*\b")
 
@@ -309,13 +295,9 @@ def _infer_matched_fields_from_expression(
     expression: str,
     event_meta: Dict[str, Any],
 ) -> Dict[str, Any]:
-    """
-    Heuristically infer which fields were involved in a rule, based on its
-    JRL expression string and the available event_meta.
+    # heuristically infer which fields were involved in a rule based on its
+    # JRL expression string and the available event_meta.
 
-    We tokenize the expression, intersect with keys present in event_meta,
-    and snapshot those key->value pairs.
-    """
     if not isinstance(expression, str) or not expression.strip():
         return {}
 
@@ -333,39 +315,27 @@ def _build_rule_highlights(
     match: Dict[str, Any],
     event_meta: Dict[str, Any],
 ) -> Dict[str, Any]:
-    """
-    Build a compact "why this fired" object to live at the top of the alert.
+    # build a compact "why this fired" object to live at the top of the alert.
+    # uses fields from match plus inferred snapshot from expression and event_meta.
 
-    Uses whatever the rule engine passes in `match`, plus optionally infers
-    flagged fields directly from the rule's condition (expression) and
-    event_meta.
-
-    Supported (optional) keys on `match`:
-        - matched_fields: List[str] or Dict[str, Any]
-        - fields:         alias for matched_fields
-        - expression:     the JRL expression / condition string
-        - condition:      alias for expression
-        - reason:         short human explanation
-        - explanation:    alias for reason
-    """
     highlights: Dict[str, Any] = {}
 
-    # 1) Human-readable reason / explanation
+    # human-readable reason / explanation
     reason = match.get("reason") or match.get("explanation")
     if isinstance(reason, str) and reason.strip():
         highlights["reason"] = reason.strip()
     elif isinstance(match.get("description"), str) and match["description"].strip():
         highlights["reason"] = match["description"].strip()
 
-    # 2) Expression / condition that matched
+    # expression / condition that matched
     expression = match.get("expression") or match.get("condition")
     if isinstance(expression, str) and expression.strip():
         highlights["expression"] = expression.strip()
 
-    # 3) Concrete field/value snapshot
+    # concrete field/value snapshot
     fields_snapshot: Dict[str, Any] = {}
 
-    # 3a) If rule_handler already gave us matched_fields
+    # if rule_handler already provided matched_fields
     raw_matched = match.get("matched_fields") or match.get("fields")
     if isinstance(raw_matched, dict):
         fields_snapshot.update(raw_matched)
@@ -374,7 +344,7 @@ def _build_rule_highlights(
             if isinstance(field, str) and field in event_meta:
                 fields_snapshot[field] = event_meta[field]
 
-    # 3b) If still empty but we have an expression, infer from expression
+    # if still empty but we have an expression, infer from expression
     if not fields_snapshot and isinstance(expression, str) and expression.strip():
         inferred = _infer_matched_fields_from_expression(expression, event_meta)
         fields_snapshot.update(inferred)
@@ -385,12 +355,11 @@ def _build_rule_highlights(
     return highlights
 
 
-# Public API
+# PUBLIC API
 
 def build_alert(event: Dict[str, Any], match: Dict[str, Any]) -> Dict[str, Any]:
-    """
-    Build a saturated alert dict from an event and a rule match.
-    """
+    # build a saturated alert dict from an event and a rule match.
+
     alert_uuid = str(_generate_uuid())
     alert_timestamp = _pst_timestamp()
 
@@ -404,9 +373,9 @@ def build_alert(event: Dict[str, Any], match: Dict[str, Any]) -> Dict[str, Any]:
     event_summary = _build_event_summary(event)
     rule_highlights = _build_rule_highlights(match, event_meta)
 
-    # Dict insertion order is preserved (Python 3.7+),
-    # and json.dumps(sort_keys=False) respects it.
-    # Put rule_highlights first so triage sees the "why" immediately.
+    # dict insertion order is preserved (python 3.7+),
+    # and json.dumps(sort_keys=false) respects it.
+    # put rule_highlights first so triage sees the why immediately.
     alert: Dict[str, Any] = {}
 
     if rule_highlights:
@@ -424,9 +393,8 @@ def build_alert(event: Dict[str, Any], match: Dict[str, Any]) -> Dict[str, Any]:
 
 
 def persist_alert(alert: Dict[str, Any], path: str) -> None:
-    """
-    Append a single alert as one JSON line to the given file path.
-    """
+    # append a single alert as one json line to the given file path.
+
     directory = os.path.dirname(path)
     if directory and not os.path.isdir(directory):
         os.makedirs(directory, exist_ok=True)
@@ -443,12 +411,9 @@ def handle_matches(
     matches: List[Dict[str, Any]],
     path: str,
 ) -> List[Dict[str, Any]]:
-    """
-    Given an event and a list of rule matches, build and persist an alert
-    for each match.
+    # given an event and a list of rule matches, build and persist an alert for each.
+    # returns the list of alert dicts that were created.
 
-    Returns the list of alert dicts that were created.
-    """
     alerts: List[Dict[str, Any]] = []
 
     for match in matches:
