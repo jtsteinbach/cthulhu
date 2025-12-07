@@ -74,8 +74,8 @@ reverse_shell_netcat(high)
     | "Netcat reverse shell execution"
     : source == "auditd"
     : success == true
-    : _endswith(exe, "/nc") or _endswith(exe, "/ncat")
-    : _contains(command, " -e ") or _contains(command, "/bin/bash")
+    : exe endswith "/nc" or exe endswith "/ncat"
+    : command contains " -e " or command contains "/bin/bash"
 ```
 
 - Header: `<rule_name>(<severity>)`
