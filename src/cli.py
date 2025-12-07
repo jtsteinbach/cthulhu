@@ -1,7 +1,5 @@
 #!/usr/bin/env python3
-"""
-cli.py
-"""
+# CTHULHU module    cli.py
 
 from __future__ import annotations
 
@@ -14,13 +12,13 @@ from typing import Any, Deque, Dict, List, Optional
 from rule_handler import load_rules_from_file
 
 
-# Configuration
+# CONFIGURATION
 
-# You can change these paths to whatever you want.
+# you can change these paths to whatever you want.
 ALERT_LOG_PATH = "/cthulhu/alerts.jsonl"
 RULES_PATH = "/cthulhu/alert.rules"
 
-# Colors
+# COLORS
 RED = "\033[38;2;255;46;46m"
 GREEN = "\033[38;2;2;237;112m"
 AQUA = "\033[38;2;0;255;183m"
@@ -29,8 +27,8 @@ GRAY  = "\033[38;2;122;122;122m"
 D_GRAY  = "\033[38;2;66;66;66m"
 WHITE   = "\033[38;2;255;255;255m"
 
-# How many alerts to keep in memory for live feeds
-MAX_LIVE_ALERTS = 200
+# how many alerts to keep in memory for live feeds
+MAX_LIVE_ALERTS = 40
 
 ENTER_BUTTON = f"""
     {GREEN}┌────────────────────────────────────────┐
@@ -45,10 +43,9 @@ CTRLC_BUTTON = f"""
 """
 
 
-# Utility functions
+# UTILITY FUNCTIONS
 
 def clear_screen() -> None:
-    """Clear the terminal screen."""
     if os.name == "nt":
         os.system("cls")
     else:
@@ -56,10 +53,9 @@ def clear_screen() -> None:
 
 
 def read_alerts_from_file(path: str) -> List[Dict[str, Any]]:
-    """
-    Read all alerts from a JSONL file.
-    Returns a list of alert dicts. Invalid lines are skipped.
-    """
+    # read all alerts from a JSONL file.
+    # returns a list of alert dicts. invalid lines are skipped.
+
     alerts: List[Dict[str, Any]] = []
     if not os.path.exists(path):
         return alerts
@@ -73,17 +69,15 @@ def read_alerts_from_file(path: str) -> List[Dict[str, Any]]:
                 alert = json.loads(line)
                 alerts.append(alert)
             except json.JSONDecodeError:
-                # Skip malformed lines
+                # skip malformed lines
                 continue
 
     return alerts
 
 
 def print_alert_line(alert: Dict[str, Any]) -> None:
-    """
-    Print a single alert in the format:
-        time [alert-uid] [SEVERITY] [rule_name] Alert Description human readable
-    """
+    # print a single alert in a human-readable summary line.
+    
     ts = alert.get("alert_timestamp") or "unknown-time"
     uid = alert.get("uid") or alert.get("alert_id") or "unknown-uid"
 
@@ -107,15 +101,14 @@ def print_alert_line(alert: Dict[str, Any]) -> None:
     print(f"{D_GRAY}    {ts} {D_GRAY}[{uid}] {severity_color} {AQUA}[{rule_name}] {GRAY}{msg}")
 
 
-# Live alert feeds
+# LIVE ALERT FEEDS
 
 def tail_alerts_live(
     path: str,
     severity_filter: Optional[str] = None,
 ) -> None:
-    """
-    Live alert feed with optional severity filter.
-    """
+    # live alert feed with optional severity filter.
+    
     if not os.path.exists(path):
         print(f"{GRAY}    Alert log file not found: {path}")
         input(ENTER_BUTTON)
@@ -128,7 +121,7 @@ def tail_alerts_live(
     buffer: Deque[Dict[str, Any]] = deque(maxlen=MAX_LIVE_ALERTS)
 
     with open(path, "r", encoding="utf-8") as f:
-        # Initial prefill
+        # initial prefill
         for line in f:
             line = line.strip()
             if not line:
@@ -187,10 +180,11 @@ def tail_alerts_live(
             pass
 
 
-# Alert triage / export
+# ALERT TRIAGE / EXPORT
 
 def _find_alert_by_uid(path: str, uid: str) -> Optional[Dict[str, Any]]:
-    """Search the alerts file for an alert with the given UID."""
+    # search the alerts file for an alert with the given uid.
+    
     if not os.path.exists(path):
         return None
 
@@ -212,10 +206,8 @@ def _find_alert_by_uid(path: str, uid: str) -> Optional[Dict[str, Any]]:
 
 
 def triage_alert_by_uid(path: str) -> None:
-    """
-    Prompt the user for an alert UID, search for it in the alerts file,
-    and display full details if found.
-    """
+    # prompt the user for an alert uid, search for it, and display full details.
+    
     uid = input(f"{GREEN}    Enter Alert UID > ").strip()
     if not uid:
         print(f"{GRAY}    No UID entered.")
@@ -273,10 +265,8 @@ def triage_alert_by_uid(path: str) -> None:
 
 
 def export_alert_by_uid(path: str) -> None:
-    """
-    Prompt for an alert UID and export that alert as pretty JSON to a file.
-    Default export path: ./alert_<uid>.json
-    """
+    # prompt for an alert uid and export that alert as pretty json to a file.
+    
     uid = input(f"{GREEN}    Enter alert UID to export > ").strip()
     if not uid:
         print(f"{GRAY}    No UID entered.")
@@ -311,12 +301,11 @@ def export_alert_by_uid(path: str) -> None:
     input(ENTER_BUTTON)
 
 
-# Rules / alerts browsing
+# RULES / ALERTS BROWSING
 
 def view_loaded_rules() -> None:
-    """
-    Load and display all rule names from the rules file.
-    """
+    # load and display all rule names from the rules file.
+    
     if not os.path.exists(RULES_PATH):
         print(f"{GRAY}    Rules file not found: {RULES_PATH}")
         input(ENTER_BUTTON)
@@ -359,10 +348,8 @@ def view_loaded_rules() -> None:
 
 
 def view_search_all_alerts(path: str) -> None:
-    """
-    Display all alerts in the file in the summary format.
-    Optional rule-name substring filter.
-    """
+    # display all alerts in summary format with optional rule-name filter.
+    
     if not os.path.exists(path):
         print(f"{GRAY}    Alert log file not found: {path}")
         input(ENTER_BUTTON)
@@ -406,15 +393,11 @@ def view_search_all_alerts(path: str) -> None:
     input(ENTER_BUTTON)
 
 
-# Stats view
+# STATS VIEW
 
 def view_alert_stats(path: str) -> None:
-    """
-    Show simple stats about alerts in the file:
-        - Total alerts
-        - Alerts per severity
-        - Alerts per rule
-    """
+    # show simple stats about alerts in the file: total, per severity, per rule.
+    
     alerts = read_alerts_from_file(path)
 
     clear_screen()
@@ -460,12 +443,11 @@ def view_alert_stats(path: str) -> None:
     input(ENTER_BUTTON)
 
 
-# Main menu
+# MAIN MENU
 
 def main_menu() -> None:
-    """
-    Main interactive menu loop.
-    """
+    # main interactive menu loop.
+    
     while True:
         clear_screen()
         print(f"""
