@@ -290,10 +290,10 @@ def run_engine() -> None:
     for r in rules:
         print(f"  - {r['name']} ({r['severity']})")
 
-    print("\n^(;,;)^ CTHULHU ENGINE\n")
+    print("\n ^(;,;)^ CTHULHU ENGINE\n")
     print(f"    Alerts will be written to : {ALERT_LOG_PATH}")
     print(f"    Audit log path            : {AUDIT_LOG_PATH}")
-    print(f"    Journald ingest           : {'enabled' if ENABLE_JOURNALD else 'disabled'}")
+    print(f"    Journald ingest           : {'enabled' if ENABLE_JOURNALD else 'disabled'}\n")
     print("[ENGINE] Press Ctrl+C to stop.\n")
 
     alert_lock = threading.Lock()
