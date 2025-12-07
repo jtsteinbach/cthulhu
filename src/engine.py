@@ -1,7 +1,5 @@
 #!/usr/bin/env python3
-"""
-engine.py
-"""
+# CTHULHU main script    engine.py
 
 from __future__ import annotations
 
@@ -20,30 +18,27 @@ from rule_handler import load_rules_from_file, evaluate_rules
 from alert_handler import handle_matches, _build_event_meta, _build_event_summary
 
 
-# Configuration
+# CONFIGURATION
 
-# Paths (keep consistent with cli.py defaults)
+# paths (keep consistent with cli.py defaults)
 ALERT_LOG_PATH = "/cthulhu/alerts.jsonl"
 RULES_PATH = "/cthulhu/alert.rules"
 AUDIT_LOG_PATH = "/var/log/audit/audit.log"
 
-# Enable / disable sources
+# enable / disable sources
 ENABLE_AUDITD = True
 ENABLE_JOURNALD = True
 
-# If False, start reading audit.log from the end (only new events).
-# If True, process existing history + new events.
+# if false, start reading audit.log from the end (only new events).
+# if true, process existing history plus new events.
 READ_EXISTING_AUDIT_LOG = False
 
 
-# Utility helpers
+# UTILITY HELPERS
 
 def print_alert_line(alert: Dict[str, Any]) -> None:
-    """
-    Print a single alert in the format:
+    # print a single alert in a human-readable summary line.
 
-        time [alert-uid] [SEVERITY] [rule_name] Alert Description human readable
-    """
     ts = alert.get("alert_timestamp") or "unknown-time"
     uid = alert.get("uid") or alert.get("alert_id") or "unknown-uid"
 
@@ -59,13 +54,10 @@ def print_alert_line(alert: Dict[str, Any]) -> None:
 
 
 def follow_file(path: str, read_existing: bool = False) -> Iterable[str]:
-    """
-    Generator that yields new lines from a file in a "tail -f" fashion.
+    # generator that yields new lines from a file in a "tail -f" fashion.
+    # if read_existing is false, seeks to end before starting; if true, reads from the beginning.
 
-    If read_existing is False, seeks to end before starting.
-    If read_existing is True, reads from the beginning and continues.
-    """
-    # Wait until file exists
+    # wait until file exists
     while not os.path.exists(path):
         print(f"[engine] Waiting for audit log file to appear: {path}")
         time.sleep(2.0)
@@ -82,7 +74,7 @@ def follow_file(path: str, read_existing: bool = False) -> Iterable[str]:
             yield line
 
 
-# Event processing
+# EVENT PROCESSING
 
 def process_event(
     event: Dict[str, Any],
@@ -90,24 +82,22 @@ def process_event(
     alert_log_path: str,
     alert_lock: threading.Lock,
 ) -> None:
-    """
-    Evaluate rules against an event, build alerts for any matches,
-    persist them, and print a summary line.
-    """
+    # evaluate rules against an event, build alerts for matches, persist them, and print a summary line.
+
     event_meta = _build_event_meta(event)
     event_summary = _build_event_summary(event)
     enriched_event = {**event, **event_meta, **event_summary}
     try:
         matches = evaluate_rules(enriched_event, rules)
     except Exception as e:
-        # In production you may want structured logging here.
+        # in production you may want structured logging here.
         print(f"[engine] Error evaluating rules: {e}", file=sys.stderr)
         return
 
     if not matches:
         return
 
-    # Ensure alert file operations are serialized
+    # ensure alert file operations are serialized
     try:
         with alert_lock:
             alerts = handle_matches(enriched_event, matches, alert_log_path)
@@ -119,7 +109,7 @@ def process_event(
         print_alert_line(alert)
 
 
-# Ingest loops
+# INGEST LOOPS
 
 def auditd_ingest_loop(
     rules: List[Dict[str, Any]],
@@ -127,10 +117,8 @@ def auditd_ingest_loop(
     alert_lock: threading.Lock,
     stop_event: threading.Event,
 ) -> None:
-    """
-    Ingest loop for auditd. Tails the audit log and feeds normalized
-    events into the rule/alert pipeline.
-    """
+    # ingest loop for auditd: tails the audit log and feeds normalized events into the rule/alert pipeline.
+
     if not ENABLE_AUDITD:
         print("[engine] Auditd ingest disabled.")
         return
@@ -155,13 +143,8 @@ def journald_ingest_loop(
     alert_lock: threading.Lock,
     stop_event: threading.Event,
 ) -> None:
-    """
-    Ingest loop for journald using:
+    # ingest loop for journald using journalctl -o json --since=now -f and parse_journald_stream.
 
-        journalctl -o json --since=now -f
-
-    and feeding lines into parse_journald_stream.
-    """
     if not ENABLE_JOURNALD:
         print("[engine] Journald ingest disabled.")
         return
@@ -193,7 +176,7 @@ def journald_ingest_loop(
                 break
             process_event(event, rules, alert_log_path, alert_lock)
     finally:
-        # Try to terminate journalctl gracefully
+        # try to terminate journalctl gracefully
         try:
             proc.terminate()
         except Exception:
@@ -201,32 +184,26 @@ def journald_ingest_loop(
 
 
 def _stop_aware_iter(lines: Iterable[str], stop_event: threading.Event) -> Iterable[str]:
-    """
-    Wrap an iterable of lines so that it stops when stop_event is set.
-    """
+    # wrap an iterable of lines so that it stops when stop_event is set.
+
     for line in lines:
         if stop_event.is_set():
             break
         yield line
 
 
-# Engine main
+# ENGINE MAIN
 
 def run_engine() -> None:
-    """
-    Main engine entry point.
+    # main engine entry point: load rules, start ingest threads, and wait for ctrl+c to stop.
 
-    - Loads rules
-    - Starts ingest threads (auditd, journald)
-    - Waits for Ctrl+C to stop
-    """
-    # Resolve paths from environment if set (optional overrides)
+    # resolve paths from environment if set (optional overrides)
     global ALERT_LOG_PATH, RULES_PATH, AUDIT_LOG_PATH
     ALERT_LOG_PATH = os.getenv("SIEM_ALERT_LOG_PATH", ALERT_LOG_PATH)
     RULES_PATH = os.getenv("SIEM_RULES_PATH", RULES_PATH)
     AUDIT_LOG_PATH = os.getenv("SIEM_AUDIT_LOG_PATH", AUDIT_LOG_PATH)
 
-    # Load rules
+    # load rules
     try:
         rules = load_rules_from_file(RULES_PATH)
     except FileNotFoundError:
@@ -276,13 +253,13 @@ def run_engine() -> None:
         t.start()
 
     try:
-        # Keep main thread alive while workers run.
+        # keep main thread alive while workers run.
         while any(t.is_alive() for t in threads):
             time.sleep(1.0)
     except KeyboardInterrupt:
         print("\n[engine] Shutdown requested, stopping ingest loops...")
         stop_event.set()
-        # Give threads a moment to clean up
+        # give threads a moment to clean up
         for t in threads:
             t.join(timeout=5.0)
         print("[engine] All ingest threads stopped. Exiting.")
