@@ -43,7 +43,7 @@ reverse_shell_socat(high)
     : source == "auditd"
     : success == True
     : exe endswith "/socat"
-    : command contains " EXEC:" and (command contains "bash" or command contains "sh"
+    : command contains " EXEC:" and command contains "bash" or command contains "sh"
 
 non_root_high_etc_mod(high)
     | "Non-root modification of core auth files in /etc"
@@ -405,7 +405,7 @@ filesystem_errors(high)
     | "Filesystem errors in kernel messages"
     : source == "journald"
     : process_name == "kernel"
-    : message contains "EXT4-fs error" or (message contains "XFS" and message contains "error")
+    : message contains "EXT4-fs error" or message contains "XFS" and message contains "error"
 
 seccomp_or_apparmor_violation(high)
     | "Seccomp/AppArmor security policy violation"
@@ -641,7 +641,7 @@ passwd_file_copy_to_tmp(high)
     : source == "auditd"
     : category == "file"
     : success == True
-    : filepath startswith "/tmp/" and (filepath contains "passwd" or filepath contains "shadow")
+    : filepath startswith "/tmp/" and filepath contains "passwd" or filepath contains "shadow"
 
 new_user_home_creation(medium)
     | "Creation of new home directory under /home"
@@ -824,16 +824,14 @@ cryptominer_execution(high)
     | "Execution of common cryptocurrency miner binary"
     : source == "auditd"
     : success == True
-    : exe contains "xmrig" or exe contains "minerd" or exe contains "ethminer" or exe contains "cpuminer" or exe contains "cgminer"
-       or command contains "xmrig" or command contains "minerd" or command contains "ethminer" or command contains "cpuminer" or command contains "cgminer"
+    : exe contains "xmrig" or exe contains "minerd" or exe contains "ethminer" or exe contains "cpuminer" or exe contains "cgminer" or command contains "xmrig" or command contains "minerd" or command contains "ethminer" or command contains "cpuminer" or command contains "cgminer"
 
 cryptominer_from_tmp_or_home(high)
     | "Cryptominer-like binary executed from /tmp or home directory"
     : source == "auditd"
     : success == True
     : exe startswith "/tmp/" or exe startswith "/var/tmp/" or exe startswith "/dev/shm/" or exe startswith "/home/"
-    : exe contains "xmrig" or exe contains "minerd" or exe contains "ethminer" or exe contains "cpuminer" or exe contains "cgminer"
-       or command contains "xmrig" or command contains "minerd" or command contains "ethminer" or command contains "cpuminer" or command contains "cgminer"
+    : exe contains "xmrig" or exe contains "minerd" or exe contains "ethminer" or exe contains "cpuminer" or exe contains "cgminer" or command contains "xmrig" or command contains "minerd" or command contains "ethminer" or command contains "cpuminer" or command contains "cgminer"
 
 cryptominer_download_via_curl_or_wget(medium)
     | "curl/wget download referencing common miner names"
