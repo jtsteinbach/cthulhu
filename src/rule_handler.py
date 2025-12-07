@@ -1,37 +1,4 @@
-"""
-rule_handler.py
-
-Simple rule engine for normalized events from ingest_events.py
-
-syntax:
-
-    rule_name(severity)
-        | "Human readable description"
-        : condition1
-        : condition2
-        : condition3
-
-All ':' conditions are combined with logical AND.
-
-Example:
-
-    root_shell(high)
-        | "Interactive root shell"
-        : source == "auditd"
-        : success == true
-        : uid == 0
-        : tty is not null
-
-Conditions support:
-    - Literals: true, false, null
-    - Comparisons: ==, !=, <, >, <=, >=
-    - Null checks: "is null", "is not null"
-    - Boolean ops: and, or, not, parentheses
-    - String ops: "a contains b", "a startswith b", "a endswith b"
-
-This file does not know about auditd/journald specifics; it only assumes
-that events are dicts with keys that match what ingest_events provides.
-"""
+# CTHULHU module    rule_handler.py
 
 from __future__ import annotations
 
@@ -39,7 +6,7 @@ import re
 from typing import Any, Callable, Dict, List
 
 
-# String helper functions used inside expressions
+# string helper functions used inside expressions
 
 def _contains(value: Any, needle: Any) -> bool:
     if value is None:
@@ -59,25 +26,22 @@ def _endswith(value: Any, suffix: Any) -> bool:
     return str(value).endswith(str(suffix))
 
 
-# Condition normalization
+# CONDITION NORMALIZATION
 
 def _normalize_condition_line(line: str) -> str:
-    """
-    Normalize a single condition line into safe Python. This version uses a
-    tokenization approach so we NEVER accidentally merge `or` with `_contains`
-    or `_endswith`.
-    """
+    # normalize a single condition line into safe python. this version uses a
+    # tokenization approach to prevent merging `or` with `_contains` or `_endswith`.
 
     expr = line.strip()
 
-    # Normalize literals
+    # normalize literals
     expr = re.sub(r"\btrue\b", "True", expr)
     expr = re.sub(r"\bfalse\b", "False", expr)
     expr = re.sub(r"\bnull\b", "None", expr)
     expr = re.sub(r"\bis\s+not\s+null\b", "is not None", expr)
     expr = re.sub(r"\bis\s+null\b", "is None", expr)
 
-    # ---- TOKENIZE BY BOOLEAN OPERATORS ----
+    # tokenize by boolean operators
     parts = re.split(r'\b(and|or)\b', expr)
 
     normalized_parts = []
@@ -88,7 +52,7 @@ def _normalize_condition_line(line: str) -> str:
     for part in parts:
         stripped = part.strip()
 
-        # Boolean operators pass through unchanged
+        # boolean operators pass through unchanged
         if stripped in ("and", "or"):
             normalized_parts.append(stripped)
             continue
@@ -105,19 +69,15 @@ def _normalize_condition_line(line: str) -> str:
 
         normalized_parts.append(part)
 
-    # Reassemble with proper spacing
+    # reassemble with proper spacing
     final_expr = " ".join(normalized_parts).strip()
     return final_expr
 
 
 def _compile_rule_expression(cond_lines: List[str]) -> Callable[[Dict[str, Any]], bool]:
-    """
-    Compile a list of condition lines into a predicate:
-
-        fn(event: dict) -> bool
-
-    cond_lines are raw condition strings *without* leading ":".
-    """
+    # compile a list of condition lines into a predicate.
+    # cond_lines are raw condition strings *without* leading ":".
+    
     if not cond_lines:
         expr_src = "True"  # rule always matches if no conditions
     else:
@@ -127,11 +87,9 @@ def _compile_rule_expression(cond_lines: List[str]) -> Callable[[Dict[str, Any]]
     code = compile(expr_src, "<rule>", "eval")
 
     def predicate(event: Dict[str, Any]) -> bool:
-        """
-        Evaluate the compiled rule expression against an event dict.
+        # evaluate the compiled rule expression against an event dict.
+        # event keys are injected as variables in the eval context.
 
-        Event keys are injected as variables in the eval context.
-        """
         local_env: Dict[str, Any] = dict(event)
         local_env.update(
             {
@@ -140,28 +98,19 @@ def _compile_rule_expression(cond_lines: List[str]) -> Callable[[Dict[str, Any]]
                 "_endswith": _endswith,
             }
         )
-        # No builtins to reduce risk surface; rules only use provided names.
+        # no builtins to reduce risk surface; rules only use provided names.
         return bool(eval(code, {"__builtins__": {}}, local_env))
 
-    # Optional: store source expression for debugging
+    # optional: store source expression for debugging
     predicate._expr_src = expr_src  # type: ignore[attr-defined]
     return predicate
 
 
-# Rule loading
+# RULE LOADING
 
 def load_rules_from_file(path: str) -> List[Dict[str, Any]]:
-    """
-    Load rules from a rules file.
+    # load rules from JRL rules file.
 
-    Returns: list of rule dicts:
-        {
-            "name": str,
-            "severity": str,
-            "description": str,
-            "predicate": fn(event) -> bool,
-        }
-    """
     with open(path, "r", encoding="utf-8") as f:
         lines = [l.rstrip("\n") for l in f]
 
@@ -176,7 +125,7 @@ def load_rules_from_file(path: str) -> List[Dict[str, Any]]:
             i += 1
             continue
 
-        # Rule header: name(severity)
+        # rule header: name(severity)
         m = re.match(r"^([A-Za-z_]\w*)\s*\(\s*([A-Za-z_]+)\s*\)\s*$", line)
         if not m:
             raise ValueError(f"Invalid rule header at line {i+1}: {line!r}")
@@ -185,7 +134,7 @@ def load_rules_from_file(path: str) -> List[Dict[str, Any]]:
         severity = m.group(2)
         i += 1
 
-        # Description line: | "text"
+        # description line: | "text"
         if i >= total:
             raise ValueError(f"Missing description line for rule {name!r}")
 
@@ -199,7 +148,7 @@ def load_rules_from_file(path: str) -> List[Dict[str, Any]]:
         description = m_desc.group(1)
         i += 1
 
-        # Condition lines
+        # condition lines
         cond_lines: List[str] = []
         while i < total:
             raw = lines[i]
@@ -211,12 +160,12 @@ def load_rules_from_file(path: str) -> List[Dict[str, Any]]:
                 break
 
             if stripped.startswith(":"):
-                # Remove leading ":" and surrounding whitespace
+                # remove leading ":" and surrounding whitespace
                 cond = stripped[1:].strip()
                 cond_lines.append(cond)
                 i += 1
             else:
-                # Next rule header (or other content)
+                # next rule header (or other content)
                 break
 
         predicate = _compile_rule_expression(cond_lines)
@@ -233,21 +182,11 @@ def load_rules_from_file(path: str) -> List[Dict[str, Any]]:
     return rules
 
 
-# Rule evaluation
+# RULE EVALUATION
 
 def evaluate_rules(event: Dict[str, Any], rules: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
-    """
-    Evaluate all rules against a single event.
+    # evaluate all rules against a single event.
 
-    Returns a list of matched rule summaries:
-        {
-            "rule": str,
-            "severity": str,
-            "description": str,
-        }
-
-    Any rule evaluation errors are swallowed (you may want to log them).
-    """
     matches: List[Dict[str, Any]] = []
     for rule in rules:
         try:
@@ -261,7 +200,7 @@ def evaluate_rules(event: Dict[str, Any], rules: List[Dict[str, Any]]) -> List[D
                     }
                 )
         except Exception:
-            # In production you might log the error with rule["name"]
+            # in production you might log the error with rule["name"]
             continue
 
     return matches
