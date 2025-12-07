@@ -74,6 +74,72 @@ def follow_file(path: str, read_existing: bool = False) -> Iterable[str]:
             yield line
 
 
+def _resolve_parent_process_info(ppid: int) -> Dict[str, Any]:
+    # Best-effort resolution of parent process metadata, similar to what `top`/`ps` show,
+    # but preferring live /proc information when available.
+    
+    parent_name: str | None = None
+    parent_path: str | None = None
+
+    if not isinstance(ppid, int) or ppid <= 0:
+        return {
+            "parent_process_name": None,
+            "parent_process_path": None,
+        }
+
+    comm_path = f"/proc/{ppid}/comm"
+    exe_link = f"/proc/{ppid}/exe"
+
+    # /proc/<ppid>/comm -> process name (what top/ps usually show)
+    try:
+        with open(comm_path, "r", encoding="utf-8", errors="replace") as f:
+            name = f.read().strip()
+            if name:
+                parent_name = name
+    except Exception:
+        pass
+
+    # /proc/<ppid>/exe -> resolved executable path (symlink target)
+    try:
+        target = os.readlink(exe_link)
+        if target:
+            parent_path = target
+    except Exception:
+        pass
+
+    return {
+        "parent_process_name": parent_name,
+        "parent_process_path": parent_path,
+    }
+
+
+def _enrich_parent_process(event: Dict[str, Any]) -> Dict[str, Any]:
+    ppid = event.get("ppid")
+
+    if not isinstance(ppid, int) or ppid <= 0:
+        # nothing to do, keep event unchanged
+        return event
+
+    parent_info = _resolve_parent_process_info(ppid)
+
+    # Only set keys if we actually attempted resolution; don't touch existing keys
+    # if user wants to inject their own values upstream.
+    if "parent_process_name" not in event:
+        event["parent_process_name"] = parent_info.get("parent_process_name")
+    else:
+        # If it exists but is None/empty, prefer /proc result when available.
+        if not event["parent_process_name"] and parent_info.get("parent_process_name"):
+            event["parent_process_name"] = parent_info["parent_process_name"]
+
+    if "parent_process_path" not in event:
+        event["parent_process_path"] = parent_info.get("parent_process_path")
+    else:
+        if not event["parent_process_path"] and parent_info.get("parent_process_path"):
+            event["parent_process_path"] = parent_info["parent_process_path"]
+
+    return event
+
+
 # EVENT PROCESSING
 
 def process_event(
@@ -83,6 +149,8 @@ def process_event(
     alert_lock: threading.Lock,
 ) -> None:
     # evaluate rules against an event, build alerts for matches, persist them, and print a summary line.
+
+    event = _enrich_parent_process(event)
 
     event_meta = _build_event_meta(event)
     event_summary = _build_event_summary(event)
