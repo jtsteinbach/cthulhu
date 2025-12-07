@@ -10,7 +10,7 @@ Rules evaluate against **enriched events**, which include:
 - Raw auditd or journald event fields  
 - Normalized meta fields  
 - Enrichment fields (process_name, command_line, file_ext, etc.)
-- Severities: LOW, MEDIUM, HIGH
+- Severities: low, medium, high
 
 Rules follow this structure:
 
