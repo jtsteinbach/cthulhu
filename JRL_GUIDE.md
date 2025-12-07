@@ -107,6 +107,8 @@ auid
 gid
 pid
 ppid
+ppid_name
+ppid_path
 session
 filepath
 filepaths
@@ -123,6 +125,8 @@ process_name
 exe_basename
 process_id
 parent_pid
+parent_process_name
+parent_process_path
 target_path
 file_name
 file_ext
@@ -186,6 +190,8 @@ A complete auditd event provides fields like:
   "gid": 1000,
   "pid": 2000,
   "ppid": 1999,
+  "parent_process_name": "bash",
+  "parent_process_path": "/usr/bin/bash",
   "session": 12,
   "host": "hostname",
   "filepath": "/tmp/file.txt",
