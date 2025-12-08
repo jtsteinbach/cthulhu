@@ -14,7 +14,7 @@ CTH_ROOT="/cthulhu"
 # ensure script is run as root
 ensure_root() {
     if [[ "${EUID:-$(id -u)}" -ne 0 ]]; then
-        echo "this script must be run as root (try: sudo bash setup_cthulhu.sh)" >&2
+        echo "[CTHULHU Setup] this script must be run as root (try: sudo bash setup.sh)" >&2
         exit 1
     fi
 }
@@ -30,12 +30,11 @@ sync_repo_to_cthulhu() {
     dest_root="$CTH_ROOT"
     dest_src="$CTH_ROOT/src"
 
-    echo "[setup] syncing repository contents from: $repo_root"
-    echo "[setup]   src/         -> $dest_src"
-    echo "[setup]   alert.rules  -> $dest_root/alert.rules"
+    echo "    [1/2] src/         -> $dest_src"
+    echo "    [2/2] alert.rules  -> $dest_root/alert.rules"
 
     if [[ ! -d "$src_dir" ]]; then
-        echo "[setup][error] src directory not found at: $src_dir" >&2
+        echo "[CTHULHU Setup] src directory not found at: $src_dir" >&2
         exit 1
     fi
 
@@ -48,7 +47,7 @@ sync_repo_to_cthulhu() {
     if [[ -f "$rules_file" ]]; then
         cp "$rules_file" "$dest_root/alert.rules"
     else
-        echo "[setup][warn] alert.rules not found at: $rules_file (skipping copy)" >&2
+        echo "[CTHULHU Setup] alert.rules not found at: $rules_file (skipping copy)" >&2
     fi
 
     # make sure everything under /cthulhu is owned by root
