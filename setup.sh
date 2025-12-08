@@ -20,6 +20,50 @@ ensure_root() {
 }
 
 
+ensure_journald_and_auditd_installed() {
+    # journald check: look for journalctl as a proxy for systemd-journald
+    if ! command -v journalctl >/dev/null 2>&1; then
+        echo "    [1/2] journald not found; attempting to install systemd/journald"
+
+        if command -v apt-get >/dev/null 2>&1; then
+            export DEBIAN_FRONTEND=noninteractive
+            apt-get update
+            apt-get install -y systemd
+        elif command -v dnf >/dev/null 2>&1; then
+            dnf install -y systemd
+        elif command -v yum >/dev/null 2>&1; then
+            yum install -y systemd
+        elif command -v pacman >/dev/null 2>&1; then
+            pacman -Sy --noconfirm systemd
+        else
+            echo "    [ERROR] cannot install journald: no supported package manager (apt/dnf/yum/pacman)" >&2
+            exit 1
+        fi
+    fi
+
+    # auditd check: auditctl binary or auditd.service unit
+    if ! command -v auditctl >/dev/null 2>&1 && \
+       ! systemctl list-unit-files --type=service 2>/dev/null | grep -q '^auditd\.service'; then
+        echo "    /[2/2] auditd not found; attempting install"
+
+        if command -v apt-get >/dev/null 2>&1; then
+            export DEBIAN_FRONTEND=noninteractive
+            apt-get update
+            apt-get install -y auditd
+        elif command -v dnf >/dev/null 2>&1; then
+            dnf install -y audit
+        elif command -v yum >/dev/null 2>&1; then
+            yum install -y audit
+        elif command -v pacman >/dev/null 2>&1; then
+            pacman -Sy --noconfirm audit
+        else
+            echo "    [ERROR] cannot install auditd: no supported package manager (apt/dnf/yum/pacman)" >&2
+            exit 1
+        fi
+    fi
+}
+
+
 # copy repo contents (src/ + alert.rules) into /cthulhu
 sync_repo_to_cthulhu() {
     # directory where this setup.sh lives
@@ -34,7 +78,7 @@ sync_repo_to_cthulhu() {
     echo "    [2/2] alert.rules  -> $dest_root/alert.rules"
 
     if [[ ! -d "$src_dir" ]]; then
-        echo "[CTHULHU Setup] src directory not found at: $src_dir" >&2
+        echo "    [ERROR] src directory not found at: $src_dir" >&2
         exit 1
     fi
 
@@ -47,7 +91,7 @@ sync_repo_to_cthulhu() {
     if [[ -f "$rules_file" ]]; then
         cp "$rules_file" "$dest_root/alert.rules"
     else
-        echo "[CTHULHU Setup] alert.rules not found at: $rules_file (skipping copy)" >&2
+        echo "    [ERROR] alert.rules not found at: $rules_file (skipping copy)" >&2
     fi
 
     # make sure everything under /cthulhu is owned by root
@@ -111,20 +155,24 @@ main() {
     ensure_root
     
     echo "^(;,;)^ CTHULHU Setup"
-    echo "[1/4] syncing repo into $CTH_ROOT"
+    echo "[1/5] verifying/installing dependancies (auditd & journald)"
+    ensure_journald_and_auditd_installed
+    
+    echo "[2/5] syncing repo into $CTH_ROOT"
     sync_repo_to_cthulhu
 
-    echo "[2/4] writing systemd unit: $SERVICE_PATH"
+    echo "[3/5] writing systemd unit: $SERVICE_PATH"
     write_service_file
 
-    echo "[3/4] writing cli wrapper: $CTH_WRAPPER_PATH"
+    echo "[4/5] writing cli wrapper: $CTH_WRAPPER_PATH"
     write_cth_wrapper
 
-    echo "[4/4] reloading systemd, enabling and starting cthulhu.service"
+    echo "[5/5] reloading systemd, enabling and starting cthulhu.service"
     reload_and_enable_service
 
     echo
     echo "^(;,;)^ CTHULHU Installed"
+    echo "https://jts.gg/cthulhu"
     echo
     echo "  service : systemctl status cthulhu.service"
     echo "  cli     : run 'cth' from any shell"
