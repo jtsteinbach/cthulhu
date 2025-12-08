@@ -154,21 +154,29 @@ reload_and_enable_service() {
 main() {
     ensure_root
     
-    echo "^(;,;)^ CTHULHU Setup"
+    echo
+    echo "^(;,;)^ CTHULHU Setup Installer"
+    echo "https://jts.gg/cthulhu"
+    echo
     echo "[1/5] verifying/installing dependancies (auditd & journald)"
     ensure_journald_and_auditd_installed
+    sleep 2
     
-    echo "[2/5] syncing repo into $CTH_ROOT"
+    echo "[2/5] syncing repo into: $CTH_ROOT"
     sync_repo_to_cthulhu
+    sleep 2
 
     echo "[3/5] writing systemd unit: $SERVICE_PATH"
     write_service_file
+    sleep 2
 
     echo "[4/5] writing cli wrapper: $CTH_WRAPPER_PATH"
     write_cth_wrapper
+    sleep 2
 
     echo "[5/5] reloading systemd, enabling and starting cthulhu.service"
     reload_and_enable_service
+    sleep 2
 
     echo
     echo "^(;,;)^ CTHULHU Installed"
