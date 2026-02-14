@@ -730,26 +730,17 @@ def main_menu() -> None:
         clear_screen()
         print(f"""
     {GREEN}┌──────────────────────────────┐
-    {GREEN}│                              │
-    {GREEN}│           {AQUA}^(;,;)^ {D_GRAY}v1.3       {GREEN}│
-    {GREEN}│         {AQUA}CTHULHU SIEM         {GREEN}│
-    {GREEN}│                              │
-    {GREEN}│       {AQUA}Built for Debian       {GREEN}│
-    {GREEN}│   {GRAY}https://r2.jts.gg/license  {GREEN}│
-    {GREEN}│    {GRAY}https://jts.gg/cthulhu    {GREEN}│
-    {GREEN}│                              │
+    {GREEN}│                              │        {GREEN}1. {AQUA}LIVE ALERT FEED
+    {GREEN}│           {AQUA}^(;,;)^ {D_GRAY}v1.3       {GREEN}│        {GRAY}FILTERED LIVE ALERT FEED
+    {GREEN}│         {AQUA}CTHULHU SIEM         {GREEN}│        {GREEN}3. {AQUA}ALERT TRIAGE
+    {GREEN}│                              │        {GREEN}4. {GRAY}VIEW/SEARCH ALL ALERTS
+    {GREEN}│       {AQUA}Built for Debian       {GREEN}|        {GREEN}5. {GRAY}EXPORT ALERT
+    {GREEN}│   {GRAY}https://r2.jts.gg/license  {GREEN}│        {GREEN}6. {GRAY}ALERT STATS
+    {GREEN}│    {GRAY}https://jts.gg/cthulhu    {GREEN}│        {GREEN}7. {GRAY}LOADED RULES
+    {GREEN}│                              │        {GREEN}q. {GRAY}QUIT
     {GREEN}└──────────────────────────────┘
-
-    {GREEN}1. {YELLOW}LIVE ALERT FEED
-    {GREEN}2. {GRAY}FILTERED LIVE ALERT FEED
-    {GREEN}3. {YELLOW}ALERT TRIAGE
-    {GREEN}4. {GRAY}VIEW/SEARCH ALL ALERTS
-    {GREEN}5. {GRAY}EXPORT ALERT
-    {GREEN}6. {GRAY}ALERT STATS
-    {GREEN}7. {GRAY}LOADED RULES
-    {GREEN}q. {GRAY}QUIT
     """)
-        choice = input(f"{GREEN}    Select Action > ").strip().lower()
+        choice = input(f"{GREEN}    Select action by number > ").strip().lower()
 
         if choice == "1":
             tail_alerts_live(ALERT_LOG_PATH)
