@@ -115,7 +115,7 @@ Type=simple
 # run the engine unbuffered so logs hit journald immediately
 Environment=PYTHONUNBUFFERED=1
 # "pyt" represents python 3.13 threading build, change to python3 for normal python
-ExecStart=/usr/bin/env pyt $ENGINE_PATH
+ExecStart=/usr/bin/env python3 $ENGINE_PATH
 WorkingDirectory=/cthulhu/src
 
 User=root
