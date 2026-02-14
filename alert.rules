@@ -341,13 +341,6 @@ root_shell_interactive(high)
     : exe endswith "/bash" or exe endswith "/sh" or exe endswith "/zsh"
     : tty is not None
 
-high_uid_process_start(low)
-    | "Process started as privileged user (uid < 1000)"
-    : source == "auditd"
-    : command_line != "(systemd)"
-    : success == True
-    : uid >= 0 and uid < 1000
-
 ssh_root_login_failure(medium)
     | "Failed SSH login attempt for root user"
     : source == "journald"
