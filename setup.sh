@@ -6,6 +6,7 @@ set -euo pipefail
 # configuration
 SERVICE_PATH="/etc/systemd/system/cthulhu.service"
 ENGINE_PATH="/cthulhu/src/engine.py"
+ALERTS_PATH="/cthulhu/alerts.jsonl"
 CLI_PATH="/cthulhu/src/cli.py"
 CTH_WRAPPER_PATH="/usr/local/bin/cth"
 CTH_ROOT="/cthulhu"
@@ -83,6 +84,8 @@ sync_repo_to_cthulhu() {
     fi
 
     mkdir -p "$dest_src"
+
+    echo "" > $ALERTS_PATH
 
     # copy all files from src/ into /cthulhu/src
     cp -r "$src_dir"/. "$dest_src"/
