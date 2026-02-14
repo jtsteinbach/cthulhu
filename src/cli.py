@@ -731,12 +731,12 @@ def main_menu() -> None:
         print(f"""
     {GREEN}┌──────────────────────────────┐
     {GREEN}│                              │        {GREEN}1. {AQUA}LIVE ALERT FEED
-    {GREEN}│           {AQUA}^(;,;)^ {D_GRAY}v1.3       {GREEN}│        {GRAY}FILTERED LIVE ALERT FEED
-    {GREEN}│         {AQUA}CTHULHU SIEM         {GREEN}│        {GREEN}3. {AQUA}ALERT TRIAGE
+    {GREEN}│           {AQUA}^(;,;)^ {D_GRAY}v1.3       {GREEN}│        2. {GRAY}FILTERED LIVE ALERT FEED
+    {GREEN}│         {AQUA}CTHULHU SIEM         {GREEN}│        3. {AQUA}ALERT TRIAGE
     {GREEN}│                              │        {GREEN}4. {GRAY}VIEW/SEARCH ALL ALERTS
-    {GREEN}│       {AQUA}Built for Debian       {GREEN}|        {GREEN}5. {GRAY}EXPORT ALERT
-    {GREEN}│   {GRAY}https://r2.jts.gg/license  {GREEN}│        {GREEN}6. {GRAY}ALERT STATS
-    {GREEN}│    {GRAY}https://jts.gg/cthulhu    {GREEN}│        {GREEN}7. {GRAY}LOADED RULES
+    {GREEN}│       {AQUA}Built for Debian       {GREEN}|        5. {GRAY}EXPORT ALERT
+    {GREEN}│   {GRAY}https://r2.jts.gg/license  {GREEN}│        6. {GRAY}ALERT STATS
+    {GREEN}│    {GRAY}https://jts.gg/cthulhu    {GREEN}│        7. {GRAY}LOADED RULES
     {GREEN}│                              │        {GREEN}q. {GRAY}QUIT
     {GREEN}└──────────────────────────────┘
     """)
