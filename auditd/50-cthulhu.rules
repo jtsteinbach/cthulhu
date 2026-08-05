@@ -1,0 +1,207 @@
+## CTHULHU SIEM — auditd policy
+##
+## Written in auditd's syntax and read by the kernel audit subsystem.
+## Controls what gets logged; alerts.jrl controls what raises an alert.
+##
+## Installed to /etc/audit/rules.d/50-cthulhu.rules and compiled by
+## augenrules into /etc/audit/audit.rules.
+##
+## WHY THIS FILE EXISTS
+## ────────────────────
+## auditd ships with an effectively empty policy. Without these rules the
+## kernel emits almost nothing, and the auditd-backed detections in
+## alerts.jrl have no events to match. This is the single most common reason
+## a Linux SIEM appears to "work" while seeing nothing.
+##
+## VOLUME
+## ──────
+## Ordered cheapest-first. The execve rules are the backbone and are worth
+## their cost on any host. Sections marked HIGH VOLUME are commented out by
+## default — enable them deliberately, and watch `auditctl -s` for a rising
+## `lost` counter afterwards.
+##
+## Reload with:  augenrules --load     (or: auditctl -R /etc/audit/audit.rules)
+## Inspect with: auditctl -l  /  auditctl -s
+
+## ── Reset ────────────────────────────────────────────────────────────────
+-D
+
+## ── Buffers ──────────────────────────────────────────────────────────────
+## 8192 suits a busy server. Raise if `auditctl -s` reports lost events.
+-b 8192
+## Wait rather than drop when the backlog fills (kernel 3.14+).
+--backlog_wait_time 60000
+## 1 = printk on failure. Use 2 (panic) only on hosts where audit loss is
+## considered a security incident in itself.
+-f 1
+## Rate limit: 0 disables. Set a ceiling only if the host cannot keep up.
+-r 0
+
+## ── Ignore self-inflicted noise ──────────────────────────────────────────
+## CTHULHU reads its own alert file; auditd and journald churn constantly.
+-a never,exit -F arch=b64 -F exe=/usr/sbin/auditd
+-a never,exit -F arch=b64 -F exe=/usr/lib/systemd/systemd-journald
+-a never,exit -F arch=b64 -F dir=/var/log/audit/
+-a never,exit -F arch=b64 -F dir=/proc/ -F perm=r
+-a never,exit -F arch=b64 -F dir=/sys/ -F perm=r
+
+## ═════════════════════════════════════════════════════════════════════════
+##  PROCESS EXECUTION  — the backbone of the ruleset
+##  Feeds: reverse shells, miners, recon, container escapes, GTFOBins.
+##  auid>=1000 restricts to human-initiated activity; auid=unset excludes
+##  daemons started at boot. Drop the auid filter to capture service
+##  execution too (noticeably higher volume).
+## ═════════════════════════════════════════════════════════════════════════
+-a always,exit -F arch=b64 -S execve,execveat -F auid>=1000 -F auid!=unset -k cth_exec
+-a always,exit -F arch=b32 -S execve,execveat -F auid>=1000 -F auid!=unset -k cth_exec
+
+## Anything executed as root, regardless of login uid — catches service
+## compromise and daemon-spawned shells (e.g. a webshell under www-data).
+-a always,exit -F arch=b64 -S execve,execveat -F euid=0 -k cth_exec_root
+
+## ═════════════════════════════════════════════════════════════════════════
+##  IDENTITY & AUTHORIZATION
+## ═════════════════════════════════════════════════════════════════════════
+-w /etc/passwd     -p wa -k cth_identity
+-w /etc/group      -p wa -k cth_identity
+-w /etc/gshadow    -p wa -k cth_identity
+-w /etc/subuid     -p wa -k cth_identity
+-w /etc/subgid     -p wa -k cth_identity
+
+## Shadow is watched for reads as well — reading it is credential theft.
+-w /etc/shadow                 -p rwa -k cth_shadow
+-w /etc/security/opasswd       -p rwa -k cth_shadow
+
+-w /etc/sudoers                -p wa -k cth_sudoers
+-w /etc/sudoers.d/             -p wa -k cth_sudoers
+-w /etc/pam.d/                 -p wa -k cth_pam
+-w /etc/pam.conf               -p wa -k cth_pam
+-w /etc/nsswitch.conf          -p wa -k cth_pam
+-w /etc/security/              -p wa -k cth_pam
+
+## ═════════════════════════════════════════════════════════════════════════
+##  PERSISTENCE
+## ═════════════════════════════════════════════════════════════════════════
+-w /etc/ssh/sshd_config        -p wa -k cth_ssh
+-w /etc/ssh/sshd_config.d/     -p wa -k cth_ssh
+-w /root/.ssh/                 -p wa -k cth_ssh_keys
+
+-w /etc/crontab                -p wa -k cth_cron
+-w /etc/cron.d/                -p wa -k cth_cron
+-w /etc/cron.daily/            -p wa -k cth_cron
+-w /etc/cron.hourly/           -p wa -k cth_cron
+-w /etc/cron.weekly/           -p wa -k cth_cron
+-w /etc/cron.monthly/          -p wa -k cth_cron
+-w /var/spool/cron/            -p wa -k cth_cron
+-w /var/spool/at/              -p wa -k cth_cron
+-w /etc/at.allow               -p wa -k cth_cron
+-w /etc/anacrontab             -p wa -k cth_cron
+
+-w /etc/systemd/system/        -p wa -k cth_systemd
+-w /usr/lib/systemd/system/    -p wa -k cth_systemd
+-w /lib/systemd/system/        -p wa -k cth_systemd
+-w /etc/init.d/                -p wa -k cth_systemd
+-w /etc/rc.local               -p wa -k cth_boot
+-w /etc/udev/rules.d/          -p wa -k cth_udev
+
+-w /etc/profile                -p wa -k cth_shellcfg
+-w /etc/profile.d/             -p wa -k cth_shellcfg
+-w /etc/bash.bashrc            -p wa -k cth_shellcfg
+-w /etc/environment            -p wa -k cth_shellcfg
+-w /etc/update-motd.d/         -p wa -k cth_shellcfg
+
+## Library injection — the highest-value single watch on this list.
+-w /etc/ld.so.preload          -p wa -k cth_preload
+-w /etc/ld.so.conf             -p wa -k cth_preload
+-w /etc/ld.so.conf.d/          -p wa -k cth_preload
+
+## Boot chain.
+-w /boot/                      -p wa -k cth_boot
+-w /etc/grub.d/                -p wa -k cth_boot
+
+## ═════════════════════════════════════════════════════════════════════════
+##  DEFENSE EVASION & SELF-PROTECTION
+## ═════════════════════════════════════════════════════════════════════════
+-w /etc/audit/                 -p wa -k cth_audit_cfg
+-w /etc/audisp/                -p wa -k cth_audit_cfg
+-w /usr/sbin/auditctl          -p x  -k cth_audit_cfg
+-w /usr/sbin/auditd            -p x  -k cth_audit_cfg
+-w /usr/bin/journalctl         -p x  -k cth_logtamper
+
+-w /var/log/                   -p wa -k cth_logtamper
+-w /var/log/wtmp               -p wa -k cth_logins
+-w /var/log/btmp               -p wa -k cth_logins
+-w /var/run/utmp               -p wa -k cth_logins
+
+-w /etc/selinux/               -p wa -k cth_mac
+-w /etc/apparmor.d/            -p wa -k cth_mac
+
+## Kernel modules — rootkit loading.
+-a always,exit -F arch=b64 -S init_module,finit_module,delete_module -k cth_module
+-w /sbin/insmod   -p x -k cth_module
+-w /sbin/modprobe -p x -k cth_module
+-w /sbin/rmmod    -p x -k cth_module
+
+## ═════════════════════════════════════════════════════════════════════════
+##  PRIVILEGE ESCALATION
+## ═════════════════════════════════════════════════════════════════════════
+## Non-root process becoming root.
+-a always,exit -F arch=b64 -S setuid,setreuid,setresuid -F auid>=1000 -F auid!=unset -k cth_privesc
+-a always,exit -F arch=b64 -S setgid,setregid,setresgid -F auid>=1000 -F auid!=unset -k cth_privesc
+
+## Setuid/setgid bits being applied.
+-a always,exit -F arch=b64 -S chmod,fchmod,fchmodat -F auid>=1000 -F auid!=unset -k cth_perm
+-a always,exit -F arch=b64 -S chown,fchown,fchownat,lchown -F auid>=1000 -F auid!=unset -k cth_perm
+
+## Process injection / debugging of live processes.
+-a always,exit -F arch=b64 -S ptrace -F auid>=1000 -F auid!=unset -k cth_ptrace
+
+## Privileged binaries commonly abused for escalation.
+-w /usr/bin/sudo    -p x -k cth_privcmd
+-w /bin/su          -p x -k cth_privcmd
+-w /usr/bin/pkexec  -p x -k cth_privcmd
+-w /usr/bin/passwd  -p x -k cth_privcmd
+-w /usr/bin/chsh    -p x -k cth_privcmd
+-w /usr/bin/chfn    -p x -k cth_privcmd
+-w /usr/bin/gpasswd -p x -k cth_privcmd
+-w /usr/bin/newgrp  -p x -k cth_privcmd
+-w /usr/sbin/setcap -p x -k cth_privcmd
+-w /usr/bin/crontab -p x -k cth_privcmd
+
+## ═════════════════════════════════════════════════════════════════════════
+##  SYSTEM STATE
+## ═════════════════════════════════════════════════════════════════════════
+-a always,exit -F arch=b64 -S mount,umount2 -F auid>=1000 -F auid!=unset -k cth_mount
+-a always,exit -F arch=b64 -S settimeofday,clock_settime,adjtimex -k cth_time
+-w /etc/localtime -p wa -k cth_time
+-w /etc/hosts     -p wa -k cth_network
+-w /etc/resolv.conf -p wa -k cth_network
+
+## Container runtime sockets — direct root equivalence.
+-w /var/run/docker.sock -p rwa -k cth_container
+-w /run/containerd/containerd.sock -p rwa -k cth_container
+
+## ═════════════════════════════════════════════════════════════════════════
+##  HIGH VOLUME — enable deliberately
+## ═════════════════════════════════════════════════════════════════════════
+
+## Outbound network connections. Powers suspicious_outbound_connection and
+## connection_to_uncommon_port. On a busy server this is the loudest rule in
+## the file; enable it on endpoints and jump hosts first.
+# -a always,exit -F arch=b64 -S connect -F auid>=1000 -F auid!=unset -k cth_net
+
+## Every file deletion by a real user. Powers ransomware and anti-forensics
+## detection, but fires constantly during builds and package operations.
+# -a always,exit -F arch=b64 -S unlink,unlinkat,rename,renameat,renameat2 -F auid>=1000 -F auid!=unset -k cth_delete
+
+## Writes into web roots — useful specifically on web servers.
+# -w /var/www/ -p wa -k cth_webroot
+
+## ═════════════════════════════════════════════════════════════════════════
+##  IMMUTABLE MODE
+## ═════════════════════════════════════════════════════════════════════════
+## Uncomment to lock the audit configuration until the next reboot. Strongly
+## recommended once tuning has settled: it prevents an attacker with root
+## from quietly disabling the sensor. Note that with -e 2 in place you cannot
+## change audit rules without rebooting.
+# -e 2

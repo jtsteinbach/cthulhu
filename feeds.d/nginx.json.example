@@ -1,0 +1,18 @@
+{
+  "name": "nginx",
+  "description": "nginx access log (combined format)",
+  "paths": [
+    "/var/log/nginx/access.log",
+    "/var/log/nginx/*-access.log"
+  ],
+  "format": "regex",
+  "category": "web",
+  "action": "http_request",
+  "pattern": "^(?P<remote_ip>\\S+) \\S+ (?P<auth_user>\\S+) \\[(?P<ts>[^\\]]+)\\] \"(?P<http_method>[A-Z]+) (?P<http_path>[^ ?\"]*)\\??(?P<http_query>[^ \"]*) (?P<http_version>[^\"]*)\" (?P<http_status>\\d{3}) (?P<bytes_sent>\\d+|-) \"(?P<referer>[^\"]*)\" \"(?P<user_agent>[^\"]*)\"",
+  "timestamp_field": "ts",
+  "types": {
+    "http_status": "int",
+    "bytes_sent": "int"
+  },
+  "message_field": "http_path"
+}

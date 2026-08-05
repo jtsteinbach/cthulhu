@@ -1,0 +1,1540 @@
+#  ^(;,;)^  CTHULHU SIEM — BASELINE DETECTION RULESET
+#  ────────────────────────────────────────────────────────────────────────
+#  Drop-in coverage for a general-purpose Linux host. Every rule here is
+#  written to fire on real, attacker-relevant behaviour and to stay quiet
+#  during normal administration and package management.
+#
+#  HOW TO TUNE THIS FILE
+#  ─────────────────────
+#  Do not edit rules one by one. Edit the @list blocks in SECTION 0 below.
+#  They are referenced with $name throughout the file, so adding your backup
+#  agent to $trusted_automation silences it everywhere at once.
+#
+#  Validate any change before restarting:      cth check
+#  Reload a running engine without downtime:   systemctl reload cthulhu
+#
+#  SEVERITY MEANING
+#  ────────────────
+#    critical  Active compromise. Wake someone up.
+#    high      Strong attacker signal. Investigate today.
+#    medium    Suspicious or policy-relevant. Review in batch.
+#    low       Notable context. Useful during an investigation.
+#    info      Baseline telemetry. Off by default in the console.
+#
+#  Requires the companion audit policy (auditd/50-cthulhu.rules) to be loaded,
+#  otherwise auditd emits almost nothing and the auditd rules stay silent.
+#  ────────────────────────────────────────────────────────────────────────
+
+
+# ══════════════════════════════════════════════════════════════════════════
+#  SECTION 0 — TUNING
+#  Everything an operator should need to change lives here.
+# ══════════════════════════════════════════════════════════════════════════
+
+# Processes that legitimately rewrite system files. The single biggest source
+# of false positives on any Linux host. Add your config-management agent here.
+@list trusted_automation = [
+    "apt", "apt-get", "aptitude", "dpkg", "dpkg-deb", "unattended-upgrade",
+    "unattended-upgr", "yum", "dnf", "rpm", "zypper", "pacman", "apk",
+    "snapd", "snap", "packagekitd", "flatpak",
+    "ansible-playbook", "python3.ansible", "puppet", "puppet-agent",
+    "chef-client", "salt-minion", "salt-call", "cf-agent",
+    "cloud-init", "systemd", "systemd-sysusers", "systemd-tmpfiles",
+    "dockerd", "containerd", "kubelet", "runc",
+    "needrestart", "landscape-sysin", "update-motd"
+]
+
+# Backup / monitoring agents that legitimately read broadly across the disk.
+@list trusted_readers = [
+    "rsync", "restic", "borg", "duplicity", "bacula-fd", "amanda",
+    "veeamagent", "node_exporter", "zabbix_agentd", "telegraf",
+    "datadog-agent", "falcon-sensor", "wazuh-agentd", "osqueryd",
+    "auditd", "aide", "tripwire", "rkhunter", "chkrootkit", "clamscan",
+    "freshclam", "logrotate", "updatedb", "mandb", "plocate"
+]
+
+# Interactive shells.
+@list shells = [
+    "bash", "sh", "dash", "zsh", "ksh", "csh", "tcsh", "fish", "ash", "busybox"
+]
+
+# Script interpreters that can be abused to spawn shells or open sockets.
+@list interpreters = [
+    "python", "python2", "python3", "perl", "ruby", "php", "lua", "node",
+    "nodejs", "tclsh", "expect", "gawk", "awk", "mawk"
+]
+
+# Tools that move data on or off the box.
+@list transfer_tools = [
+    "curl", "wget", "ftp", "tftp", "sftp", "scp", "rsync", "socat", "nc",
+    "ncat", "netcat", "nc.traditional", "nc.openbsd", "aria2c", "axel",
+    "lftp", "smbclient", "rclone"
+]
+
+# Host and network reconnaissance binaries.
+@list recon_tools = [
+    "nmap", "masscan", "zmap", "unicornscan", "hping3", "arp-scan",
+    "netdiscover", "fping", "enum4linux", "nbtscan", "onesixtyone",
+    "snmpwalk", "dnsrecon", "dnsenum", "sublist3r", "whatweb", "nikto"
+]
+
+# Credential-theft and post-exploitation tooling.
+@list offensive_tools = [
+    "mimipenguin", "linpeas", "linpeas.sh", "linenum", "linenum.sh",
+    "pspy", "pspy32", "pspy64", "les.sh", "linux-exploit-suggester",
+    "unix-privesc-check", "traitor", "gtfoblookup", "dirtycow",
+    "hashcat", "john", "hydra", "medusa", "patator", "crackmapexec",
+    "responder", "chisel", "ligolo", "frpc", "frps", "gost", "iodine",
+    "dnscat2", "ptunnel", "sshuttle", "revshell", "msfvenom", "meterpreter"
+]
+
+# Cryptocurrency miner process names and pool markers.
+@list miner_names = [
+    "xmrig", "minerd", "cpuminer", "cgminer", "bfgminer", "ethminer",
+    "nbminer", "t-rex", "phoenixminer", "lolminer", "teamredminer",
+    "xmr-stak", "ccminer", "kryptex", "nanominer", "srbminer"
+]
+@list miner_markers = [
+    "stratum+tcp://", "stratum+ssl://", "--donate-level", "nicehash.com",
+    "minexmr", "supportxmr", "pool.hashvault", "nanopool.org",
+    "f2pool.com", "ethermine.org", "2miners.com", "--cpu-priority"
+]
+
+# Directories that are world-writable or otherwise unusual origins for code.
+@list volatile_dirs = [
+    "/tmp/", "/var/tmp/", "/dev/shm/", "/run/shm/", "/run/user/",
+    "/var/spool/", "/var/crash/"
+]
+
+# Credential material worth alerting on when read.
+@list credential_paths = [
+    "/etc/shadow", "/etc/gshadow", "/etc/shadow-", "/etc/gshadow-",
+    "/etc/security/opasswd", "/etc/krb5.keytab"
+]
+
+# Files whose modification implies persistence or privilege change.
+@list identity_files = [
+    "/etc/passwd", "/etc/shadow", "/etc/group", "/etc/gshadow",
+    "/etc/sudoers", "/etc/subuid", "/etc/subgid"
+]
+
+@list shell_profiles = [
+    "/etc/profile", "/etc/bash.bashrc", "/etc/zsh/zshrc", "/etc/environment"
+]
+
+# Log locations an attacker would tamper with.
+@list log_dirs = ["/var/log/", "/var/log/audit/", "/run/log/journal/"]
+
+# Destructive binaries.
+@list destructive_tools = ["rm", "shred", "wipe", "srm", "dd", "truncate", "mkfs"]
+
+# Hosts/IPs allowed to authenticate without raising volume alerts.
+# Add jump boxes and monitoring pollers here.
+@list trusted_sources = []
+
+# Accounts exempt from interactive-usage rules (service accounts you expect
+# to see running shells). Leave empty on a hardened host.
+@list service_accounts = []
+
+
+# ══════════════════════════════════════════════════════════════════════════
+#  SECTION 1 — EXECUTION  (MITRE TA0002)
+#  Reverse shells, interpreter abuse, and code running from volatile storage.
+# ══════════════════════════════════════════════════════════════════════════
+
+reverse_shell_netcat(critical)
+    | "Netcat invoked with command execution — classic reverse shell"
+    ~ on: auditd
+    ~ mitre: T1059.004, T1071.001
+    ~ tags: execution, reverse_shell, c2
+    : category == "process"
+    : success == true
+    : exe_name in ["nc", "ncat", "netcat", "nc.traditional", "nc.openbsd"]
+    : cmdline matches "(^|\s)-[a-zA-Z]*e(\s|$)" or cmdline contains ["-c /bin/", "--exec", "--sh-exec"]
+
+reverse_shell_bash_devtcp(critical)
+    | "Bash /dev/tcp or /dev/udp socket — fileless reverse shell"
+    ~ on: auditd
+    ~ mitre: T1059.004
+    ~ tags: execution, reverse_shell, fileless
+    : category == "process"
+    : cmdline contains ["/dev/tcp/", "/dev/udp/"]
+
+reverse_shell_interpreter_socket(critical)
+    | "Interpreter one-liner opening a socket and spawning a shell"
+    ~ on: auditd
+    ~ mitre: T1059.006, T1059.004
+    ~ tags: execution, reverse_shell
+    : category == "process"
+    : exe_name in $interpreters
+    : cmdline icontains ["socket", "socket.socket", "io.popen", "fsockopen"]
+    : cmdline icontains ["/bin/sh", "/bin/bash", "dup2", "pty.spawn", "shell_exec", "exec("]
+
+reverse_shell_socat(critical)
+    | "socat used to bridge a socket to a shell"
+    ~ on: auditd
+    ~ mitre: T1059.004
+    ~ tags: execution, reverse_shell
+    : category == "process"
+    : exe_name == "socat"
+    : cmdline icontains ["exec:", "system:"]
+    : cmdline icontains ["/bin/sh", "/bin/bash", "pty"]
+
+reverse_shell_mkfifo(high)
+    | "Named-pipe shell relay (mkfifo + nc pattern)"
+    ~ on: auditd
+    ~ mitre: T1059.004
+    ~ tags: execution, reverse_shell
+    : category == "process"
+    : cmdline contains "mkfifo"
+    : cmdline icontains ["nc ", "ncat ", "telnet ", "/bin/sh", "/bin/bash"]
+
+shell_spawned_by_web_service(critical)
+    | "Web or database service spawned a shell — likely webshell or RCE"
+    ~ on: auditd
+    ~ mitre: T1505.003, T1190
+    ~ tags: execution, webshell, initial_access
+    : category == "process"
+    : success == true
+    : exe_name in $shells
+    : parent_name in [
+        "apache2", "httpd", "nginx", "php-fpm", "php-fpm7.4", "php-fpm8.1",
+        "php-fpm8.2", "php", "tomcat", "java", "node", "gunicorn", "uwsgi",
+        "mysqld", "postgres", "redis-server", "mongod", "lighttpd", "caddy"
+      ]
+
+exec_from_volatile_dir(high)
+    | "Binary executed from a world-writable or volatile directory"
+    ~ on: auditd
+    ~ mitre: T1059, T1204.002
+    ~ tags: execution, staging
+    ~ throttle: 5m
+    ~ dedup: exe
+    : category == "process"
+    : success == true
+    : exe startswith $volatile_dirs
+    : parent_name not in $trusted_automation
+
+script_from_volatile_dir(high)
+    | "Interpreter executing a script staged in a volatile directory"
+    ~ on: auditd
+    ~ mitre: T1059
+    ~ tags: execution, staging
+    : category == "process"
+    : success == true
+    : exe_name in $interpreters
+    : cmdline matches "\s/(tmp|var/tmp|dev/shm|run/shm)/\S+"
+    : parent_name not in $trusted_automation
+
+download_and_execute(critical)
+    | "Remote payload piped directly into a shell or interpreter"
+    ~ on: auditd
+    ~ mitre: T1059.004, T1105
+    ~ tags: execution, ingress_tool_transfer
+    : category == "process"
+    : cmdline icontains ["curl ", "wget ", "fetch "]
+    : cmdline matches "\|\s*(sudo\s+)?(ba)?sh|\|\s*python|\|\s*perl|\-O\s*-\s*\|"
+
+memfd_fileless_execution(critical)
+    | "Execution from an anonymous in-memory file descriptor"
+    ~ on: auditd
+    ~ mitre: T1620
+    ~ tags: execution, fileless, defense_evasion
+    : category == "process"
+    : exe contains "memfd:" or exe matches "^/proc/self/fd/\d+" or cmdline contains "memfd_create"
+
+encoded_command_execution(high)
+    | "Base64-decoded content piped into an interpreter"
+    ~ on: auditd
+    ~ mitre: T1027, T1140
+    ~ tags: execution, obfuscation
+    : category == "process"
+    : cmdline icontains ["base64 -d", "base64 --decode", "base64 -D", "openssl enc -d"]
+    : cmdline matches "\|\s*(ba)?sh|\|\s*python|\|\s*perl|eval"
+
+offensive_tooling_executed(critical)
+    | "Known offensive security or credential-cracking tool executed"
+    ~ on: auditd
+    ~ mitre: T1588.002
+    ~ tags: execution, tooling
+    : category == "process"
+    : exe_name in $offensive_tools or cmdline matches "(?i)(linpeas|linenum|pspy|mimipenguin|crackmapexec|chisel)"
+
+hidden_binary_execution(high)
+    | "Execution of a dot-prefixed (hidden) file"
+    ~ on: auditd
+    ~ mitre: T1564.001
+    ~ tags: execution, defense_evasion
+    : category == "process"
+    : success == true
+    : exe matches "/\.[^/]+$"
+    : exe not in ["/usr/bin/.", "/bin/."]
+
+suspicious_process_masquerade(high)
+    | "Process name mimics a kernel thread or common daemon from an odd path"
+    ~ on: auditd
+    ~ mitre: T1036.004, T1036.005
+    ~ tags: execution, masquerading
+    : category == "process"
+    : exe_name in ["kworker", "ksoftirqd", "kthreadd", "migration", "rcu_sched",
+                   "systemd", "sshd", "cron", "dbus-daemon", "kswapd0"]
+    : exe not startswith ["/usr/", "/bin/", "/sbin/", "/lib/"]
+
+nohup_background_execution(low)
+    | "Process detached with nohup or setsid from an interactive session"
+    ~ on: auditd
+    ~ mitre: T1059
+    ~ tags: execution, persistence
+    ~ throttle: 10m
+    : category == "process"
+    : exe_name in ["nohup", "setsid", "disown"]
+    : interactive == true
+    : auid_set == true
+
+
+# ══════════════════════════════════════════════════════════════════════════
+#  SECTION 2 — PERSISTENCE  (MITRE TA0003)
+#  Anything that survives a reboot or a session close.
+# ══════════════════════════════════════════════════════════════════════════
+
+ssh_authorized_keys_modified(critical)
+    | "SSH authorized_keys modified — durable remote access backdoor"
+    ~ on: auditd
+    ~ mitre: T1098.004
+    ~ tags: persistence, ssh, backdoor
+    : category == "file"
+    : success == true
+    : path endswith ["/authorized_keys", "/authorized_keys2"]
+    : is_write == true or nametype in ["CREATE", "DELETE"]
+    : parent_name not in $trusted_automation
+
+cron_job_created(high)
+    | "System cron entry created or modified"
+    ~ on: auditd
+    ~ mitre: T1053.003
+    ~ tags: persistence, scheduled_task
+    : category == "file"
+    : success == true
+    : path startswith ["/etc/cron.d/", "/etc/cron.daily/", "/etc/cron.hourly/",
+                       "/etc/cron.weekly/", "/etc/cron.monthly/", "/var/spool/cron/"]
+      or path == "/etc/crontab"
+    : is_write == true or nametype in ["CREATE", "DELETE"]
+    : parent_name not in $trusted_automation
+
+crontab_edited_by_user(medium)
+    | "User invoked crontab to edit a schedule"
+    ~ on: auditd
+    ~ mitre: T1053.003
+    ~ tags: persistence, scheduled_task
+    : category == "process"
+    : exe_name == "crontab"
+    : cmdline !contains " -l"
+
+at_job_scheduled(medium)
+    | "One-shot job scheduled via at/batch"
+    ~ on: auditd
+    ~ mitre: T1053.002
+    ~ tags: persistence, scheduled_task
+    : category == "process"
+    : exe_name in ["at", "batch"]
+
+systemd_unit_created(high)
+    | "systemd unit file written outside package management"
+    ~ on: auditd
+    ~ mitre: T1543.002
+    ~ tags: persistence, service
+    : category == "file"
+    : success == true
+    : path startswith ["/etc/systemd/system/", "/lib/systemd/system/",
+                       "/usr/lib/systemd/system/", "/run/systemd/system/"]
+      or path matches "/\.config/systemd/user/"
+    : is_write == true or nametype in ["CREATE", "DELETE"]
+    : parent_name not in $trusted_automation
+
+systemd_timer_created(high)
+    | "systemd timer created — scheduled execution persistence"
+    ~ on: auditd
+    ~ mitre: T1053.006
+    ~ tags: persistence, scheduled_task
+    : category == "file"
+    : success == true
+    : path endswith ".timer"
+    : is_write == true or nametype in ["CREATE", "DELETE"]
+    : parent_name not in $trusted_automation
+
+rc_local_modified(high)
+    | "Boot script rc.local modified"
+    ~ on: auditd
+    ~ mitre: T1037.004
+    ~ tags: persistence, boot
+    : category == "file"
+    : success == true
+    : path in ["/etc/rc.local", "/etc/rc.d/rc.local", "/etc/init.d/rc.local"]
+    : is_write == true or nametype in ["CREATE", "DELETE"]
+    : parent_name not in $trusted_automation
+
+shell_profile_modified(high)
+    | "Shell startup file modified — persistence on next login"
+    ~ on: auditd
+    ~ mitre: T1546.004
+    ~ tags: persistence, shell
+    : category == "file"
+    : success == true
+    : path in $shell_profiles
+      or path endswith [".bashrc", ".bash_profile", ".bash_login", ".profile",
+                        ".zshrc", ".zprofile", ".zshenv", ".kshrc"]
+      or path startswith "/etc/profile.d/"
+    : is_write == true or nametype in ["CREATE", "DELETE"]
+    : parent_name not in $trusted_automation
+
+ld_preload_persistence(critical)
+    | "ld.so.preload modified — library injection into every new process"
+    ~ on: auditd
+    ~ mitre: T1574.006
+    ~ tags: persistence, rootkit, defense_evasion
+    : category == "file"
+    : path in ["/etc/ld.so.preload", "/etc/ld.so.conf"]
+    : is_write == true or nametype in ["CREATE", "DELETE"]
+      or path startswith "/etc/ld.so.conf.d/"
+
+ld_preload_env_abuse(high)
+    | "Process launched with LD_PRELOAD or LD_LIBRARY_PATH override"
+    ~ on: auditd
+    ~ mitre: T1574.006
+    ~ tags: persistence, privilege_escalation
+    : category == "process"
+    : cmdline contains ["LD_PRELOAD=", "LD_LIBRARY_PATH=", "LD_AUDIT="]
+
+pam_configuration_modified(critical)
+    | "PAM configuration or module changed — authentication backdoor"
+    ~ on: auditd
+    ~ mitre: T1556.003
+    ~ tags: persistence, credential_access
+    : category == "file"
+    : success == true
+    : path startswith ["/etc/pam.d/", "/lib/security/", "/lib64/security/",
+                       "/usr/lib/security/"]
+      or path == "/etc/pam.conf"
+    : parent_name not in $trusted_automation
+
+nsswitch_modified(high)
+    | "Name service switch configuration modified"
+    ~ on: auditd
+    ~ mitre: T1556
+    ~ tags: persistence, credential_access
+    : category == "file"
+    : path == "/etc/nsswitch.conf"
+    : is_write == true or nametype in ["CREATE", "DELETE"]
+    : parent_name not in $trusted_automation
+
+sshd_config_modified(high)
+    | "SSH daemon configuration modified"
+    ~ on: auditd
+    ~ mitre: T1098.004, T1562
+    ~ tags: persistence, ssh
+    : category == "file"
+    : success == true
+    : path == "/etc/ssh/sshd_config" or path startswith "/etc/ssh/sshd_config.d/"
+    : parent_name not in $trusted_automation
+
+udev_rule_created(high)
+    | "udev rule written — device-event triggered persistence"
+    ~ on: auditd
+    ~ mitre: T1546
+    ~ tags: persistence
+    : category == "file"
+    : path startswith ["/etc/udev/rules.d/", "/lib/udev/rules.d/"]
+    : is_write == true or nametype in ["CREATE", "DELETE"]
+    : parent_name not in $trusted_automation
+
+motd_script_modified(medium)
+    | "Dynamic MOTD script modified — runs on every login"
+    ~ on: auditd
+    ~ mitre: T1546
+    ~ tags: persistence
+    : category == "file"
+    : path startswith "/etc/update-motd.d/"
+    : is_write == true or nametype in ["CREATE", "DELETE"]
+    : parent_name not in $trusted_automation
+
+initramfs_or_grub_modified(high)
+    | "Boot loader or initramfs configuration modified"
+    ~ on: auditd
+    ~ mitre: T1542.001
+    ~ tags: persistence, boot
+    : category == "file"
+    : path startswith ["/boot/", "/etc/grub.d/", "/etc/default/grub"]
+    : parent_name not in $trusted_automation
+
+new_user_account_created(high)
+    | "Local user or group account created"
+    ~ on: auditd
+    ~ mitre: T1136.001
+    ~ tags: persistence, account
+    : category == "process"
+    : success == true
+    : exe_name in ["useradd", "adduser", "newusers", "groupadd", "addgroup"]
+
+user_added_to_privileged_group(critical)
+    | "Account granted membership of an administrative group"
+    ~ on: auditd
+    ~ mitre: T1098
+    ~ tags: persistence, privilege_escalation
+    : category == "process"
+    : exe_name in ["usermod", "gpasswd", "adduser", "addgroup"]
+    : cmdline matches "(?i)(sudo|wheel|admin|adm|root|docker|lxd|disk|shadow)"
+
+identity_file_modified(critical)
+    | "Core identity file modified outside package management"
+    ~ on: auditd
+    ~ mitre: T1098, T1136.001
+    ~ tags: persistence, account
+    : category == "file"
+    : success == true
+    : path in $identity_files
+    : is_write == true or nametype in ["CREATE", "DELETE"]
+    : parent_name not in $trusted_automation
+    : exe_name not in ["useradd", "usermod", "userdel", "groupadd", "groupmod",
+                       "groupdel", "passwd", "chpasswd", "gpasswd", "vipw", "chfn"]
+
+sudoers_modified(critical)
+    | "sudoers policy modified — direct path to root"
+    ~ on: auditd
+    ~ mitre: T1548.003
+    ~ tags: persistence, privilege_escalation
+    : category == "file"
+    : success == true
+    : path == "/etc/sudoers" or path startswith "/etc/sudoers.d/"
+    : is_write == true or nametype in ["CREATE", "DELETE"]
+    : exe_name != "visudo"
+    : parent_name not in $trusted_automation
+
+
+# ══════════════════════════════════════════════════════════════════════════
+#  SECTION 3 — PRIVILEGE ESCALATION  (MITRE TA0004)
+# ══════════════════════════════════════════════════════════════════════════
+
+setuid_binary_created(critical)
+    | "A setuid or setgid binary was created or its bits were set"
+    ~ on: auditd
+    ~ mitre: T1548.001
+    ~ tags: privilege_escalation, persistence
+    : category == "file"
+    : success == true
+    : is_setuid == true or is_setgid == true
+    : is_write == true or nametype in ["CREATE", "DELETE"]
+    : parent_name not in $trusted_automation
+
+chmod_setuid_invoked(high)
+    | "chmod used to apply a setuid/setgid bit"
+    ~ on: auditd
+    ~ mitre: T1548.001
+    ~ tags: privilege_escalation
+    : category == "process"
+    : exe_name in ["chmod", "install"]
+    : cmdline matches "\s(u\+s|g\+s|[0-7]?[2467][0-7]{3})(\s|$)"
+
+setuid_in_volatile_dir(critical)
+    | "setuid binary present in a world-writable directory"
+    ~ on: auditd
+    ~ mitre: T1548.001
+    ~ tags: privilege_escalation
+    : category == "file"
+    : is_setuid == true
+    : path startswith $volatile_dirs
+
+capability_granted(high)
+    | "File capabilities assigned with setcap"
+    ~ on: auditd
+    ~ mitre: T1548
+    ~ tags: privilege_escalation
+    : category == "process"
+    : exe_name == "setcap"
+    : cmdline contains "cap_"
+
+pkexec_privilege_abuse(critical)
+    | "pkexec invoked with no arguments or an empty environment (CVE-2021-4034 pattern)"
+    ~ on: auditd
+    ~ mitre: T1548.003
+    ~ tags: privilege_escalation, exploit
+    : category == "process"
+    : exe_name == "pkexec"
+    : argc <= 1
+
+sudo_shell_escape(high)
+    | "sudo used to obtain a shell directly"
+    ~ on: auditd
+    ~ mitre: T1548.003
+    ~ tags: privilege_escalation
+    : category == "process"
+    : exe_name == "sudo"
+    : cmdline matches "sudo\s+(-\S+\s+)*(/bin/|/usr/bin/)?(ba|z|k|c|t?c)?sh(\s|$)"
+      or cmdline contains ["sudo su", "sudo -s", "sudo -i"]
+
+gtfobins_shell_escape(high)
+    | "Utility invoked in a way that spawns a shell (GTFOBins pattern)"
+    ~ on: auditd
+    ~ mitre: T1548, T1059
+    ~ tags: privilege_escalation, living_off_the_land
+    : category == "process"
+    : exe_name in ["find", "vim", "vi", "nano", "less", "more", "man", "awk",
+                   "gawk", "ftp", "tar", "zip", "git", "env", "nice", "flock",
+                   "ionice", "timeout", "watch", "xargs", "ed", "tmux", "screen"]
+    : cmdline matches "(-exec\s|!/bin/|:!|--checkpoint-action=exec|-c\s+['\"]?/bin/(ba)?sh|\bexec\s+/bin/)"
+
+privilege_transition_to_root(medium)
+    | "Process transitioned to root via a setuid-family syscall"
+    ~ on: auditd
+    ~ mitre: T1548
+    ~ tags: privilege_escalation
+    ~ throttle: 5m
+    ~ dedup: exe, uid
+    : category == "privilege"
+    : success == true
+    : euid == 0
+    : uid != 0
+    : exe_name not in ["sudo", "su", "pkexec", "sshd", "login", "systemd",
+                       "crond", "cron", "dbus-daemon", "polkitd", "at", "atd"]
+
+kernel_exploit_indicators(critical)
+    | "Command line matches a known local kernel exploit"
+    ~ on: auditd
+    ~ mitre: T1068
+    ~ tags: privilege_escalation, exploit
+    : category == "process"
+    : cmdline matches "(?i)(dirtycow|dirty_cow|dirtypipe|dirty_pipe|pwnkit|overlayfs|CVE-20\d\d-\d+|nf_tables|sequoia)"
+
+ptrace_process_injection(high)
+    | "ptrace attach against another process — injection or debugging of a live target"
+    ~ on: auditd
+    ~ mitre: T1055.008
+    ~ tags: privilege_escalation, injection
+    ~ throttle: 5m
+    : category == "privilege"
+    : syscall_name == "ptrace"
+    : success == true
+    : exe_name not in ["gdb", "strace", "ltrace", "lldb", "perf", "dlv",
+                       "systemd-coredump", "containerd"]
+
+sudo_authentication_failure(medium)
+    | "Failed sudo authentication"
+    ~ on: journald
+    ~ mitre: T1548.003
+    ~ tags: privilege_escalation, auth
+    ~ threshold: 3 in 5m by auth_user
+    : action == "sudo"
+    : auth_result == "failure"
+
+sudo_not_in_sudoers(high)
+    | "User attempted sudo without authorization"
+    ~ on: journald
+    ~ mitre: T1548.003
+    ~ tags: privilege_escalation, auth
+    : comm == "sudo"
+    : message contains "user NOT in sudoers"
+
+sudo_to_root_by_service_account(high)
+    | "A service account escalated to root via sudo"
+    ~ on: journald
+    ~ mitre: T1548.003
+    ~ tags: privilege_escalation
+    : action == "sudo"
+    : sudo_target_user == "root"
+    : auth_user in $service_accounts
+
+
+# ══════════════════════════════════════════════════════════════════════════
+#  SECTION 4 — DEFENSE EVASION  (MITRE TA0005)
+# ══════════════════════════════════════════════════════════════════════════
+
+audit_daemon_tampering(critical)
+    | "Attempt to stop, disable or reconfigure the audit subsystem"
+    ~ on: auditd
+    ~ mitre: T1562.001
+    ~ tags: defense_evasion, anti_forensics
+    : category == "process"
+    : exe_name in ["auditctl", "systemctl", "service", "augenrules"]
+    : cmdline icontains ["auditd", "auditctl -D", "auditctl -e 0"]
+    : cmdline icontains ["stop", "disable", "mask", "-D", "-e 0", "kill"]
+
+audit_config_modified(critical)
+    | "auditd configuration or rules modified"
+    ~ on: auditd
+    ~ mitre: T1562.001
+    ~ tags: defense_evasion, anti_forensics
+    : category == "file"
+    : path startswith ["/etc/audit/", "/etc/audisp/"]
+    : is_write == true or nametype in ["CREATE", "DELETE"]
+
+audit_rules_changed_kernel(critical)
+    | "Kernel reported an audit configuration change"
+    ~ on: auditd
+    ~ mitre: T1562.001
+    ~ tags: defense_evasion, anti_forensics
+    : category == "audit"
+    : record_types contains "CONFIG_CHANGE"
+
+security_service_stopped(high)
+    | "A security or logging service was stopped, disabled or masked"
+    ~ on: auditd
+    ~ mitre: T1562.001
+    ~ tags: defense_evasion
+    : category == "process"
+    : exe_name in ["systemctl", "service", "invoke-rc.d"]
+    : cmdline icontains ["stop", "disable", "mask", "kill"]
+    : cmdline icontains ["auditd", "rsyslog", "syslog", "journald", "falcon",
+                         "wazuh", "osquery", "clamav", "apparmor", "firewalld",
+                         "ufw", "fail2ban", "iptables", "crowdstrike", "sysmon"]
+
+log_file_deleted_or_truncated(critical)
+    | "Log file removed or truncated — anti-forensics"
+    ~ on: auditd
+    ~ mitre: T1070.002
+    ~ tags: defense_evasion, anti_forensics
+    : category == "file"
+    : path startswith $log_dirs
+    : exe_name in $destructive_tools or nametype == "DELETE"
+    : parent_name not in ["logrotate", "systemd-journald", "rsyslogd"]
+    : exe_name != "logrotate"
+
+journal_vacuum(high)
+    | "systemd journal history purged"
+    ~ on: auditd
+    ~ mitre: T1070.002
+    ~ tags: defense_evasion, anti_forensics
+    : category == "process"
+    : exe_name == "journalctl"
+    : cmdline contains "--vacuum"
+
+shell_history_tampering(high)
+    | "Shell history file deleted, truncated or redirected to /dev/null"
+    ~ on: auditd
+    ~ mitre: T1070.003
+    ~ tags: defense_evasion, anti_forensics
+    : category == "file"
+    : path endswith ["/.bash_history", "/.zsh_history", "/.sh_history",
+                     "/.history", "/.python_history", "/.mysql_history",
+                     "/.psql_history"]
+    : exe_name in $destructive_tools or nametype == "DELETE"
+
+history_disabled(high)
+    | "Shell history recording disabled in the current session"
+    ~ on: auditd
+    ~ mitre: T1562.003
+    ~ tags: defense_evasion, anti_forensics
+    : category == "process"
+    : cmdline matches "(?i)(history\s+-c|unset\s+HISTFILE|HISTFILE=/dev/null|HISTSIZE=0|set\s+\+o\s+history|HISTCONTROL=ignore)"
+
+timestomping(high)
+    | "File timestamps altered to disguise modification time"
+    ~ on: auditd
+    ~ mitre: T1070.006
+    ~ tags: defense_evasion, anti_forensics
+    : category == "process"
+    : exe_name == "touch"
+    : cmdline matches "\s-[a-zA-Z]*[rtd](\s|$)|--reference|--date"
+
+immutable_attribute_set(high)
+    | "chattr used to set or clear file attributes — often hides or locks a backdoor"
+    ~ on: auditd
+    ~ mitre: T1222.002
+    ~ tags: defense_evasion, persistence
+    : category == "process"
+    : exe_name in ["chattr", "setfattr"]
+    : cmdline matches "[+-][aiu]|\s-i\s"
+
+firewall_flushed(high)
+    | "Firewall rules flushed or default policy set to accept"
+    ~ on: auditd
+    ~ mitre: T1562.004
+    ~ tags: defense_evasion
+    : category == "process"
+    : exe_name in ["iptables", "ip6tables", "nft", "ufw", "firewall-cmd"]
+    : cmdline matches "(-F|--flush|-P\s+\w+\s+ACCEPT|flush ruleset|disable|--set-default-zone=trusted)"
+
+selinux_or_apparmor_disabled(high)
+    | "Mandatory access control disabled or set to permissive"
+    ~ on: auditd
+    ~ mitre: T1562.001
+    ~ tags: defense_evasion
+    : category == "process"
+    : exe_name in ["setenforce", "aa-disable", "aa-complain", "aa-teardown", "systemctl"]
+      or path in ["/etc/selinux/config", "/etc/apparmor.d"]
+    : cmdline icontains ["0", "permissive", "disable", "apparmor", "teardown"]
+
+hidden_file_in_system_dir(medium)
+    | "Hidden file created in a system directory"
+    ~ on: auditd
+    ~ mitre: T1564.001
+    ~ tags: defense_evasion
+    ~ throttle: 10m
+    : category == "file"
+    : nametype == "CREATE"
+    : file_name startswith "."
+    : file_dir startswith ["/bin", "/sbin", "/usr/bin", "/usr/sbin", "/etc",
+                           "/lib", "/usr/lib", "/var/www", "/opt", "/dev"]
+    : file_name not in [".gitignore", ".gitkeep", ".placeholder", ".updated"]
+
+kernel_module_loaded(high)
+    | "Kernel module loaded — possible rootkit or hypervisor tampering"
+    ~ on: auditd
+    ~ mitre: T1547.006, T1014
+    ~ tags: defense_evasion, rootkit, persistence
+    : category == "process"
+    : exe_name in ["insmod", "modprobe", "kmod"]
+    : cmdline !contains " -r "
+    : parent_name not in $trusted_automation
+
+kernel_module_syscall(high)
+    | "init_module/finit_module syscall observed"
+    ~ on: auditd
+    ~ mitre: T1547.006, T1014
+    ~ tags: rootkit, persistence
+    : category == "module"
+    : syscall_name in ["init_module", "finit_module"]
+    : success == true
+
+ebpf_program_loaded(high)
+    | "eBPF program loaded — capable of hiding activity or tapping traffic"
+    ~ on: auditd
+    ~ mitre: T1014, T1040
+    ~ tags: defense_evasion, rootkit
+    : category == "process"
+    : syscall_name == "bpf" or exe_name in ["bpftool", "bpftrace"]
+    : exe_name not in ["systemd", "systemd-journald", "docker", "dockerd", "cilium-agent"]
+
+container_escape_attempt(critical)
+    | "Namespace-escape tooling or host-namespace entry"
+    ~ on: auditd
+    ~ mitre: T1611
+    ~ tags: defense_evasion, container_escape
+    : category == "process"
+    : exe_name in ["nsenter", "unshare", "chroot", "pivot_root"]
+      or cmdline contains ["--mount=/proc/1/ns", "/proc/1/root", "--target 1"]
+    : parent_name not in $trusted_automation
+
+
+# ══════════════════════════════════════════════════════════════════════════
+#  SECTION 5 — CREDENTIAL ACCESS  (MITRE TA0006)
+# ══════════════════════════════════════════════════════════════════════════
+
+shadow_file_read(critical)
+    | "Password hash database accessed by an unexpected process"
+    ~ on: auditd
+    ~ mitre: T1003.008
+    ~ tags: credential_access
+    : category == "file"
+    : success == true
+    : path in $credential_paths
+    : exe_name not in ["passwd", "chpasswd", "useradd", "usermod", "userdel",
+                       "groupadd", "gpasswd", "vipw", "chage", "sshd", "login",
+                       "su", "sudo", "systemd", "unix_chkpwd", "pam_unix",
+                       "newgrp", "chfn", "chsh", "sssd", "nscd"]
+    : exe_name not in $trusted_readers
+    : parent_name not in $trusted_automation
+
+shadow_file_read_by_shell(critical)
+    | "Password hashes read directly by a shell or interpreter"
+    ~ on: auditd
+    ~ mitre: T1003.008
+    ~ tags: credential_access
+    : category == "file"
+    : path in $credential_paths
+    : exe_name in $shells or exe_name in $interpreters
+      or exe_name in ["cat", "less", "more", "head", "tail", "strings", "cp",
+                      "dd", "xxd", "od", "grep", "awk", "sed", "vi", "vim", "nano"]
+
+ssh_private_key_access(high)
+    | "SSH private key material read by an unexpected process"
+    ~ on: auditd
+    ~ mitre: T1552.004
+    ~ tags: credential_access
+    ~ throttle: 5m
+    ~ dedup: exe, path
+    : category == "file"
+    : success == true
+    : path matches "/\.ssh/(id_[a-z0-9]+|identity)$" or path endswith [".pem", ".key", "_rsa", "_ed25519"]
+    : exe_name not in ["ssh", "sshd", "ssh-agent", "ssh-add", "ssh-keygen",
+                       "scp", "sftp", "git", "git-remote-http", "rsync", "ansible-playbook"]
+    : exe_name not in $trusted_readers
+
+cloud_credentials_access(high)
+    | "Cloud provider or container registry credentials read"
+    ~ on: auditd
+    ~ mitre: T1552.001
+    ~ tags: credential_access, cloud
+    ~ throttle: 5m
+    : category == "file"
+    : success == true
+    : path matches "/\.(aws|azure|gcloud|kube|docker|config/gcloud)/" 
+      or path endswith ["credentials", "config.json", ".kube/config",
+                        ".netrc", ".pgpass", ".my.cnf", ".git-credentials"]
+    : exe_name in $shells or exe_name in $interpreters
+      or exe_name in ["cat", "less", "more", "head", "tail", "cp", "scp",
+                      "curl", "wget", "tar", "base64", "xxd"]
+
+cloud_metadata_service_query(high)
+    | "Query to the cloud instance metadata service — credential theft vector"
+    ~ on: auditd
+    ~ mitre: T1552.005
+    ~ tags: credential_access, cloud
+    : category == "process"
+    : cmdline contains ["169.254.169.254", "metadata.google.internal",
+                        "metadata.goog", "100.100.100.200"]
+
+process_memory_dumped(critical)
+    | "Process memory read or dumped — in-memory credential theft"
+    ~ on: auditd
+    ~ mitre: T1003.007
+    ~ tags: credential_access
+    : category == "file"
+    : path matches "^/proc/\d+/(mem|maps|environ)$"
+    : exe_name not in ["gdb", "systemd-coredump", "ps", "top", "htop", "lsof",
+                       "node_exporter", "datadog-agent", "auditd", "systemd"]
+    : exe_name not in $trusted_readers
+
+core_dump_tooling(medium)
+    | "Memory acquisition tool executed"
+    ~ on: auditd
+    ~ mitre: T1003.007
+    ~ tags: credential_access
+    : category == "process"
+    : exe_name in ["gcore", "gdb", "memdump", "avml", "lime-forensics", "dd"]
+    : cmdline matches "(/proc/\d+/mem|/dev/mem|/dev/kmem|core\.)"
+
+bash_history_harvested(medium)
+    | "Shell history read by another user's process — credential hunting"
+    ~ on: auditd
+    ~ mitre: T1552.003
+    ~ tags: credential_access, discovery
+    ~ throttle: 10m
+    : category == "file"
+    : success == true
+    : path endswith [".bash_history", ".zsh_history", ".mysql_history", ".psql_history"]
+    : exe_name in ["cat", "less", "more", "head", "tail", "grep", "strings", "cp"]
+
+password_in_command_line(medium)
+    | "Credential passed as a command-line argument — exposed in process list"
+    ~ on: auditd
+    ~ mitre: T1552.001
+    ~ tags: credential_access, hygiene
+    ~ throttle: 15m
+    : category == "process"
+    : cmdline matches "(?i)(--password[= ]|(^|\s)-p\s*['\"]?\S{6,}|PGPASSWORD=|MYSQL_PWD=|--token[= ]|api[_-]?key[= ])"
+    : exe_name not in $trusted_automation
+
+keylogger_or_tty_capture(critical)
+    | "TTY input capture or keylogging tool executed"
+    ~ on: auditd
+    ~ mitre: T1056.001
+    ~ tags: credential_access
+    : category == "process"
+    : exe_name in ["logkeys", "lkl", "uberkey", "thc-vlogger", "pykeylogger", "script"]
+      or cmdline matches "/dev/input/event|ttysnoop|pam_tty_audit"
+
+
+# ══════════════════════════════════════════════════════════════════════════
+#  SECTION 6 — DISCOVERY  (MITRE TA0007)
+#  Individually low signal; valuable as corroboration and when bursty.
+# ══════════════════════════════════════════════════════════════════════════
+
+network_scanning_tool(high)
+    | "Network scanning utility executed"
+    ~ on: auditd
+    ~ mitre: T1046
+    ~ tags: discovery, scanning
+    : category == "process"
+    : exe_name in $recon_tools
+
+packet_capture_started(high)
+    | "Packet capture started — traffic interception"
+    ~ on: auditd
+    ~ mitre: T1040
+    ~ tags: discovery, collection
+    : category == "process"
+    : exe_name in ["tcpdump", "tshark", "dumpcap", "ngrep", "ettercap",
+                   "bettercap", "driftnet", "netsniff-ng"]
+
+promiscuous_mode_enabled(high)
+    | "Interface placed in promiscuous mode"
+    ~ on: auditd
+    ~ mitre: T1040
+    ~ tags: discovery, collection
+    : record_types contains "ANOM_PROMISCUOUS"
+
+host_reconnaissance_burst(medium)
+    | "Rapid sequence of host enumeration commands — automated recon"
+    ~ on: auditd
+    ~ mitre: T1082, T1087.001
+    ~ tags: discovery
+    ~ threshold: 8 in 60s by session
+    ~ throttle: 10m
+    : category == "process"
+    : exe_name in ["whoami", "id", "hostname", "uname", "lsb_release", "arch",
+                   "w", "who", "last", "lastlog", "groups", "lsof", "netstat",
+                   "ss", "ip", "ifconfig", "arp", "route", "mount", "df",
+                   "lscpu", "lspci", "lsmod", "dmidecode", "sestatus"]
+    : auid_set == true
+
+sudo_permission_enumeration(medium)
+    | "Enumeration of sudo privileges"
+    ~ on: auditd
+    ~ mitre: T1069.001
+    ~ tags: discovery, privilege_escalation
+    : category == "process"
+    : exe_name == "sudo"
+    : cmdline matches "\s-l(\s|$)|--list"
+
+setuid_binary_enumeration(high)
+    | "Filesystem-wide search for setuid binaries — privilege escalation recon"
+    ~ on: auditd
+    ~ mitre: T1083, T1069
+    ~ tags: discovery, privilege_escalation
+    : category == "process"
+    : exe_name in ["find", "locate", "plocate"]
+    : cmdline matches "-perm\s+[-/+]?[0-7]*[24467]000|-perm\s+[-/+]u\+s"
+
+credential_file_search(high)
+    | "Filesystem searched for credentials or key material"
+    ~ on: auditd
+    ~ mitre: T1552.001
+    ~ tags: discovery, credential_access
+    : category == "process"
+    : exe_name in ["grep", "egrep", "rgrep", "rg", "ag", "find", "ack"]
+    : cmdline matches "(?i)(password|passwd|BEGIN RSA|BEGIN OPENSSH|api[_-]?key|secret|aws_access|private_key|credential)"
+    : cmdline matches "\s(/|~|\.)"
+
+container_environment_discovery(medium)
+    | "Checks that fingerprint a container or hypervisor environment"
+    ~ on: auditd
+    ~ mitre: T1082, T1613
+    ~ tags: discovery, container
+    : category == "process"
+    : cmdline contains ["/.dockerenv", "/proc/1/cgroup", "/run/secrets/kubernetes.io",
+                        "kubectl get", "docker ps", "crictl ps"]
+
+
+# ══════════════════════════════════════════════════════════════════════════
+#  SECTION 7 — LATERAL MOVEMENT & C2  (MITRE TA0008 / TA0011)
+# ══════════════════════════════════════════════════════════════════════════
+
+outbound_shell_to_remote_host(high)
+    | "Interactive SSH session initiated outbound from this host"
+    ~ on: auditd
+    ~ mitre: T1021.004
+    ~ tags: lateral_movement
+    ~ throttle: 5m
+    ~ dedup: uid, cmdline
+    : category == "process"
+    : exe_name in ["ssh", "sshpass", "putty", "plink"]
+    : auid_set == true
+    : cmdline !contains "-V"
+
+ssh_host_key_checking_disabled(high)
+    | "SSH invoked with host key verification disabled — automated lateral movement"
+    ~ on: auditd
+    ~ mitre: T1021.004
+    ~ tags: lateral_movement
+    : category == "process"
+    : exe_name in ["ssh", "scp", "sftp", "sshpass"]
+    : cmdline matches "StrictHostKeyChecking[= ]*no|UserKnownHostsFile[= ]*/dev/null|-o\s+StrictHostKeyChecking"
+
+remote_execution_utility(high)
+    | "Remote command execution utility invoked"
+    ~ on: auditd
+    ~ mitre: T1021
+    ~ tags: lateral_movement
+    : category == "process"
+    : exe_name in ["pssh", "clush", "pdsh", "ansible", "salt", "fabric", "rexec",
+                   "rsh", "rlogin", "winexe", "psexec.py", "wmiexec.py", "evil-winrm"]
+
+tunneling_or_proxy_tool(critical)
+    | "Traffic tunnelling or proxy tool executed — likely C2 channel"
+    ~ on: auditd
+    ~ mitre: T1572, T1090
+    ~ tags: c2, exfiltration
+    : category == "process"
+    : exe_name in ["chisel", "ligolo", "ligolo-ng", "frpc", "frps", "gost",
+                   "iodine", "dnscat2", "ptunnel", "sshuttle", "ngrok",
+                   "cloudflared", "localtunnel", "pagekite", "tor"]
+
+ssh_port_forwarding(medium)
+    | "SSH port forwarding or dynamic SOCKS proxy established"
+    ~ on: auditd
+    ~ mitre: T1572, T1090.001
+    ~ tags: c2, lateral_movement
+    : category == "process"
+    : exe_name == "ssh"
+    : cmdline matches "\s-[a-zA-Z]*[DLRW]\s*\d|\s-o\s+GatewayPorts"
+
+suspicious_outbound_connection(medium)
+    | "Shell or interpreter opened a direct outbound network connection"
+    ~ on: auditd
+    ~ mitre: T1071
+    ~ tags: c2
+    ~ throttle: 5m
+    ~ dedup: exe, remote_ip
+    : category == "network"
+    : syscall_name == "connect"
+    : success == true
+    : addr_family in ["inet", "inet6"]
+    : exe_name in $shells or exe_name in $interpreters
+    : remote_ip not startswith ["127.", "::1", "169.254.", "10.", "192.168.",
+                                "172.16.", "172.17.", "172.18.", "172.19.",
+                                "172.2", "172.30.", "172.31."]
+
+connection_to_uncommon_port(low)
+    | "Outbound connection to a port often used by C2 frameworks"
+    ~ on: auditd
+    ~ mitre: T1571
+    ~ tags: c2
+    ~ throttle: 10m
+    ~ dedup: exe, remote_port
+    : category == "network"
+    : syscall_name == "connect"
+    : success == true
+    : remote_port in [1337, 4444, 4445, 5555, 6666, 7777, 8888, 9001, 9002,
+                      31337, 12345, 54321, 1080, 9050]
+
+
+# ══════════════════════════════════════════════════════════════════════════
+#  SECTION 8 — COLLECTION & EXFILTRATION  (MITRE TA0009 / TA0010)
+# ══════════════════════════════════════════════════════════════════════════
+
+archive_of_sensitive_paths(high)
+    | "Sensitive directory compressed — staging for exfiltration"
+    ~ on: auditd
+    ~ mitre: T1560.001
+    ~ tags: collection, exfiltration
+    : category == "process"
+    : exe_name in ["tar", "zip", "gzip", "bzip2", "xz", "7z", "7za", "rar", "zstd"]
+    : cmdline matches "(/etc|/root|/home|/var/www|/var/lib/mysql|/opt|\.ssh|\.aws)"
+    : parent_name not in $trusted_automation
+    : exe_name not in $trusted_readers
+
+outbound_file_upload(high)
+    | "Local file uploaded to a remote endpoint"
+    ~ on: auditd
+    ~ mitre: T1048
+    ~ tags: exfiltration
+    : category == "process"
+    : exe_name in ["curl", "wget"]
+    : cmdline matches "(-T\s|--upload-file|-F\s|--data-binary\s*@|--form|-d\s*@|--post-file)"
+
+exfiltration_over_transfer_tool(medium)
+    | "Bulk transfer tool moving data to a remote host"
+    ~ on: auditd
+    ~ mitre: T1048
+    ~ tags: exfiltration
+    ~ throttle: 5m
+    : category == "process"
+    : exe_name in ["scp", "sftp", "rsync", "rclone", "lftp", "smbclient"]
+    : cmdline matches "@|::|:/|remote:"
+    : parent_name not in $trusted_automation
+    : exe_name not in $trusted_readers
+
+dns_exfiltration_pattern(high)
+    | "DNS query with an abnormally long label — tunnelling or exfiltration"
+    ~ on: auditd
+    ~ mitre: T1048.003, T1071.004
+    ~ tags: exfiltration, c2
+    : category == "process"
+    : exe_name in ["dig", "nslookup", "host", "drill", "dnscat2", "iodine"]
+    : cmdline matches "[A-Za-z0-9+/=]{40,}\."
+
+clipboard_or_screen_capture(medium)
+    | "Screen or clipboard capture utility executed"
+    ~ on: auditd
+    ~ mitre: T1113, T1115
+    ~ tags: collection
+    : category == "process"
+    : exe_name in ["import", "scrot", "maim", "xwd", "gnome-screenshot",
+                   "spectacle", "xclip", "xsel", "wl-paste"]
+
+
+# ══════════════════════════════════════════════════════════════════════════
+#  SECTION 9 — IMPACT  (MITRE TA0040)
+# ══════════════════════════════════════════════════════════════════════════
+
+cryptominer_execution(critical)
+    | "Cryptocurrency miner executed"
+    ~ on: auditd
+    ~ mitre: T1496
+    ~ tags: impact, cryptomining
+    : category == "process"
+    : exe_name in $miner_names or cmdline contains $miner_markers
+
+mining_pool_reference(critical)
+    | "Mining pool endpoint referenced in a command line"
+    ~ on: auditd
+    ~ mitre: T1496
+    ~ tags: impact, cryptomining
+    : category == "process"
+    : cmdline contains $miner_markers
+
+ransomware_shadow_copy_or_backup_destruction(critical)
+    | "Backups, snapshots or journals destroyed — ransomware precursor"
+    ~ on: auditd
+    ~ mitre: T1490
+    ~ tags: impact, ransomware
+    : category == "process"
+    : cmdline matches "(?i)(lvremove|btrfs subvolume delete|zfs destroy|rm\s+.*(backup|snapshot|\.bak)|restic forget|borg delete|--purge)"
+    : parent_name not in $trusted_automation
+
+mass_file_encryption_indicator(critical)
+    | "Bulk encryption utility run against many files"
+    ~ on: auditd
+    ~ mitre: T1486
+    ~ tags: impact, ransomware
+    : category == "process"
+    : exe_name in ["openssl", "gpg", "gpg2", "ccrypt", "7z", "age"]
+    : cmdline matches "(?i)(-recursive|--recursive|-r\s+/|enc\s+-aes|--symmetric|--encrypt-files)"
+    : cmdline matches "(/home|/var/www|/srv|/data|/mnt|/opt)"
+
+ransom_note_created(critical)
+    | "File with a ransom-note style name created"
+    ~ on: auditd
+    ~ mitre: T1486
+    ~ tags: impact, ransomware
+    : category == "file"
+    : nametype == "CREATE"
+    : file_name matches "(?i)(read.?me.*decrypt|how.*(to)?.*decrypt|decrypt.*instruction|your.*files.*encrypted|recover.*files|\.locked$|\.encrypted$|\.crypt$|ransom)"
+
+destructive_wipe_command(critical)
+    | "Recursive deletion or disk overwrite targeting system paths"
+    ~ on: auditd
+    ~ mitre: T1485
+    ~ tags: impact, destruction
+    : category == "process"
+    : exe_name in $destructive_tools
+    : cmdline matches "(rm\s+(-[a-zA-Z]*[rR][a-zA-Z]*f|-[a-zA-Z]*f[a-zA-Z]*[rR])\s+/(\s|$|etc|var|home|usr|boot|opt|srv)|of=/dev/[sh]d|mkfs\.|shred\s+.*-[a-zA-Z]*u)"
+    : parent_name not in $trusted_automation
+
+system_shutdown_or_reboot(medium)
+    | "System shutdown, reboot or halt initiated"
+    ~ on: auditd
+    ~ mitre: T1529
+    ~ tags: impact
+    : category == "process"
+    : exe_name in ["shutdown", "reboot", "halt", "poweroff", "init", "systemctl"]
+    : cmdline matches "(?i)(shutdown|reboot|halt|poweroff|\sinit\s+0|\sinit\s+6|kexec)"
+    : parent_name not in $trusted_automation
+
+service_mass_stop(high)
+    | "Multiple services stopped in quick succession"
+    ~ on: auditd
+    ~ mitre: T1489
+    ~ tags: impact
+    ~ threshold: 5 in 120s by session
+    : category == "process"
+    : exe_name in ["systemctl", "service"]
+    : cmdline icontains ["stop", "disable", "mask"]
+
+
+# ══════════════════════════════════════════════════════════════════════════
+#  SECTION 10 — AUTHENTICATION & INITIAL ACCESS  (MITRE TA0001 / TA0006)
+#  Driven by journald, which carries structured sshd/sudo/PAM context.
+# ══════════════════════════════════════════════════════════════════════════
+
+ssh_brute_force(high)
+    | "Repeated failed SSH authentication from one source address"
+    ~ on: journald
+    ~ mitre: T1110.001
+    ~ tags: initial_access, bruteforce, ssh
+    ~ threshold: 8 in 120s by remote_ip
+    ~ throttle: 10m
+    : action == "ssh_login"
+    : auth_result in ["failure", "invalid_user"]
+    : remote_ip not in $trusted_sources
+
+ssh_password_spray(high)
+    | "One source address failing against many distinct usernames"
+    ~ on: journald
+    ~ mitre: T1110.003
+    ~ tags: initial_access, bruteforce, ssh
+    ~ threshold: 10 in 300s by remote_ip
+    ~ throttle: 15m
+    : action == "ssh_login"
+    : auth_result == "invalid_user"
+    : remote_ip not in $trusted_sources
+
+ssh_root_login_attempt(high)
+    | "Direct SSH authentication attempt against root"
+    ~ on: journald
+    ~ mitre: T1110, T1078.003
+    ~ tags: initial_access, ssh
+    ~ throttle: 5m
+    ~ dedup: remote_ip
+    : action == "ssh_login"
+    : auth_user == "root"
+
+ssh_root_login_success(critical)
+    | "Successful SSH login as root"
+    ~ on: journald
+    ~ mitre: T1078.003
+    ~ tags: initial_access, ssh
+    : action == "ssh_login"
+    : auth_user == "root"
+    : auth_result == "success"
+
+ssh_login_success(low)
+    | "Successful SSH authentication"
+    ~ on: journald
+    ~ mitre: T1078
+    ~ tags: auth, ssh
+    : action == "ssh_login"
+    : auth_result == "success"
+    : remote_ip not in $trusted_sources
+
+ssh_invalid_user(medium)
+    | "SSH authentication attempted for a nonexistent account"
+    ~ on: journald
+    ~ mitre: T1110
+    ~ tags: initial_access, ssh
+    ~ threshold: 3 in 60s by remote_ip
+    ~ throttle: 10m
+    : action == "ssh_login"
+    : auth_result == "invalid_user"
+
+ssh_key_authentication_from_new_source(medium)
+    | "Public-key SSH login — verify the key and source are expected"
+    ~ on: journald
+    ~ mitre: T1078, T1098.004
+    ~ tags: auth, ssh
+    ~ throttle: 30m
+    ~ dedup: auth_user, remote_ip
+    : action == "ssh_login"
+    : auth_method == "publickey"
+    : auth_result == "success"
+    : remote_ip not in $trusted_sources
+
+sshd_configuration_error(high)
+    | "SSH daemon reported a configuration or protocol error"
+    ~ on: journald
+    ~ mitre: T1562
+    ~ tags: auth, ssh
+    : comm in ["sshd", "sshd-session"]
+    : is_error == true
+    : message icontains ["bad configuration", "fatal", "error: ", "no supported key exchange"]
+
+pam_authentication_failure(medium)
+    | "PAM authentication failure"
+    ~ on: journald
+    ~ mitre: T1110
+    ~ tags: auth
+    ~ threshold: 5 in 120s by auth_user
+    ~ throttle: 10m
+    : category == "auth"
+    : message icontains ["authentication failure", "auth could not identify",
+                         "pam_unix.*authentication failure"]
+
+su_authentication_failure(medium)
+    | "Failed su attempt"
+    ~ on: journald
+    ~ mitre: T1548
+    ~ tags: auth, privilege_escalation
+    ~ threshold: 3 in 300s by auth_user
+    : comm == "su"
+    : message icontains ["authentication failure", "FAILED SU", "incorrect password"]
+
+new_session_for_system_account(high)
+    | "Login session opened for an account that should never log in"
+    ~ on: journald
+    ~ mitre: T1078.003
+    ~ tags: auth, persistence
+    : category == "auth"
+    : message matches "session opened for user (daemon|bin|sys|sync|games|man|lp|mail|news|uucp|proxy|www-data|backup|list|irc|gnats|nobody|systemd-\S+|messagebus|sshd)"
+
+account_locked_out(medium)
+    | "Account locked after repeated authentication failures"
+    ~ on: journald
+    ~ mitre: T1110
+    ~ tags: auth
+    : category == "auth"
+    : message icontains ["account locked", "pam_faillock", "pam_tally", "maximum number of authentication failures"]
+
+user_login_recorded(info)
+    | "Interactive login recorded by the audit subsystem"
+    ~ on: auditd
+    ~ mitre: T1078
+    ~ tags: auth, telemetry
+    : category == "auth"
+    : record_types contains "USER_LOGIN"
+
+
+# ══════════════════════════════════════════════════════════════════════════
+#  SECTION 11 — SYSTEM INTEGRITY & HEALTH
+#  Not attacker behaviour per se, but the first sign of one on a bad day.
+# ══════════════════════════════════════════════════════════════════════════
+
+audit_backlog_exceeded(high)
+    | "Kernel audit backlog limit exceeded — events are being dropped"
+    ~ on: journald
+    ~ tags: integrity, telemetry
+    ~ throttle: 15m
+    : message icontains ["audit_backlog_limit", "audit: backlog limit exceeded",
+                         "audit: rate limit exceeded", "kauditd hold queue overflow"]
+
+auditd_stopped(critical)
+    | "Audit daemon stopped — the primary sensor is offline"
+    ~ on: journald
+    ~ mitre: T1562.001
+    ~ tags: integrity, defense_evasion
+    : message icontains ["audit daemon", "auditd"]
+    : message icontains ["stopping", "halted", "exiting", "shutting down"]
+
+journald_messages_lost(medium)
+    | "systemd-journald dropped messages under load"
+    ~ on: journald
+    ~ tags: integrity, telemetry
+    ~ throttle: 30m
+    : comm == "systemd-journald"
+    : message icontains ["suppressed", "missed", "dropped", "rotating"]
+
+kernel_oom_killer(high)
+    | "Out-of-memory killer terminated a process"
+    ~ on: journald
+    ~ tags: integrity, availability
+    ~ throttle: 5m
+    : comm == "kernel"
+    : message icontains ["out of memory", "oom-kill", "killed process"]
+
+filesystem_error_or_readonly(high)
+    | "Filesystem error or emergency remount to read-only"
+    ~ on: journald
+    ~ tags: integrity, availability
+    : comm == "kernel"
+    : message icontains ["ext4-fs error", "xfs (", "i/o error", "remounting filesystem read-only",
+                         "buffer i/o error", "critical medium error", "filesystem corruption"]
+
+hardware_machine_check(high)
+    | "Hardware machine check exception reported"
+    ~ on: journald
+    ~ tags: integrity, hardware
+    : comm in ["kernel", "mcelog"]
+    : message icontains ["machine check", "hardware error", "mce:", "cpu thermal"]
+
+segfault_burst(medium)
+    | "Repeated segmentation faults — possible exploitation attempt"
+    ~ on: journald
+    ~ mitre: T1068
+    ~ tags: integrity, exploit
+    ~ threshold: 5 in 120s by comm
+    ~ throttle: 15m
+    : message icontains ["segfault at", "general protection fault", "trap invalid opcode"]
+
+service_repeatedly_restarting(medium)
+    | "A unit is crash-looping"
+    ~ on: journald
+    ~ tags: integrity, availability
+    ~ threshold: 4 in 300s by unit
+    ~ throttle: 15m
+    : comm == "systemd"
+    : message icontains ["start request repeated too quickly", "failed with result",
+                         "entered failed state", "scheduled restart job"]
+
+selinux_or_apparmor_denial(medium)
+    | "Mandatory access control denied an operation"
+    ~ on: auditd
+    ~ mitre: T1068
+    ~ tags: integrity
+    ~ throttle: 10m
+    ~ dedup: exe
+    : record_types contains "AVC"
+
+seccomp_violation(high)
+    | "Seccomp filter blocked a syscall — sandbox escape attempt or exploit"
+    ~ on: auditd
+    ~ mitre: T1068, T1611
+    ~ tags: integrity, container
+    ~ throttle: 10m
+    : record_types contains "SECCOMP"
+
+abnormal_process_termination(low)
+    | "Process terminated abnormally (audit ANOM_ABEND)"
+    ~ on: auditd
+    ~ tags: integrity
+    ~ throttle: 10m
+    ~ dedup: exe
+    : record_types contains "ANOM_ABEND"
+
+system_time_changed(high)
+    | "System clock or timezone changed — complicates log correlation"
+    ~ on: auditd
+    ~ mitre: T1070.006
+    ~ tags: defense_evasion, integrity
+    : category == "process"
+    : exe_name in ["date", "hwclock", "timedatectl", "ntpdate", "chronyc"]
+    : cmdline matches "(?i)(set|-s\s|--set|makestep|\s[0-9]{6,})"
+
+filesystem_mounted(medium)
+    | "Filesystem mounted — removable media or unexpected volume"
+    ~ on: auditd
+    ~ mitre: T1200
+    ~ tags: integrity
+    ~ throttle: 5m
+    : category == "process"
+    : exe_name in ["mount", "umount", "mount.nfs", "mount.cifs"]
+    : parent_name not in $trusted_automation
+    : cmdline !contains "--version"
+
+usb_storage_attached(medium)
+    | "USB storage device attached"
+    ~ on: journald
+    ~ mitre: T1200, T1052.001
+    ~ tags: integrity, removable_media
+    : comm == "kernel"
+    : message icontains ["usb-storage", "new usb device", "direct-access", "removable disk"]
+
+
+# ══════════════════════════════════════════════════════════════════════════
+#  SECTION 12 — CONTAINER & ORCHESTRATION
+# ══════════════════════════════════════════════════════════════════════════
+
+docker_socket_accessed(critical)
+    | "Docker socket accessed by an unexpected process — trivial root escalation"
+    ~ on: auditd
+    ~ mitre: T1610, T1611
+    ~ tags: container, privilege_escalation
+    : category == "file"
+    : path in ["/var/run/docker.sock", "/run/docker.sock", "/run/containerd/containerd.sock"]
+    : exe_name not in ["dockerd", "docker", "containerd", "containerd-shim",
+                       "kubelet", "runc", "compose", "docker-compose", "podman"]
+
+privileged_container_started(critical)
+    | "Container launched with privileged mode or host namespaces"
+    ~ on: auditd
+    ~ mitre: T1610, T1611
+    ~ tags: container, privilege_escalation
+    : category == "process"
+    : exe_name in ["docker", "podman", "nerdctl", "ctr"]
+    : cmdline matches "(--privileged|--pid[= ]host|--net[= ]host|--ipc[= ]host|--userns[= ]host|--cap-add[= ]?(ALL|SYS_ADMIN|SYS_PTRACE|SYS_MODULE))"
+
+container_host_mount(high)
+    | "Container started with a sensitive host path mounted"
+    ~ on: auditd
+    ~ mitre: T1611
+    ~ tags: container, privilege_escalation
+    : category == "process"
+    : exe_name in ["docker", "podman", "nerdctl", "ctr"]
+    : cmdline matches "(-v|--volume|--mount)[= ]*[^ ]*(/:/|/etc|/root|/var/run/docker.sock|/proc|/sys|/boot)"
+
+container_interactive_shell(medium)
+    | "Interactive shell opened inside a container"
+    ~ on: auditd
+    ~ mitre: T1609
+    ~ tags: container
+    ~ throttle: 5m
+    : category == "process"
+    : exe_name in ["docker", "podman", "kubectl", "crictl", "nerdctl"]
+    : cmdline matches "\s(exec|run)\s"
+    : cmdline matches "\-it|\-ti|\s-i\s|\s-t\s|/bin/(ba)?sh"
+
+kubernetes_secret_access(high)
+    | "Kubernetes secrets read from the command line"
+    ~ on: auditd
+    ~ mitre: T1552.007
+    ~ tags: container, credential_access
+    : category == "process"
+    : exe_name == "kubectl"
+    : cmdline matches "\sget\s+secret|\sdescribe\s+secret|-o\s+(json|yaml).*secret"
