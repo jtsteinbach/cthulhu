@@ -1,5 +1,3 @@
-![CTHULHU SIEM](https://r2.jts.gg/cth_img.png)
-
 # CTHULHU SIEM
 
 A small, fast, **dependency-free** SIEM for Linux hosts. Pure Python standard
